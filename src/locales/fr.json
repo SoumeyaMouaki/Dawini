@@ -1,0 +1,164 @@
+{
+  "nav": {
+    "home": "Accueil",
+    "about": "À propos",
+    "contact": "Contact",
+    "dashboard": "Mon espace"
+  },
+  "hero": {
+    "title": "Votre partenaire santé en Algérie",
+    "subtitle": "Prenez des RDV, accédez à vos ordonnances et gérez votre santé au même endroit.",
+    "search": {
+      "specialty": "Spécialité (ex: Cardiologie)",
+      "location": "Localisation (wilaya/commune)"
+    },
+    "features": {
+      "title": "Comment ça marche ?",
+      "subtitle": "Une plateforme simple et sécurisée pour tous vos besoins de santé",
+      "learnMore": "En savoir plus",
+      "findDoctor": {
+        "title": "Trouvez un médecin",
+        "description": "Recherchez par spécialité, localisation et disponibilité"
+      },
+      "prescriptions": {
+        "title": "Prescriptions électroniques",
+        "description": "Recevez et stockez vos ordonnances en toute sécurité"
+      },
+      "pharmacies": {
+        "title": "Pharmacies partenaires",
+        "description": "Validation et délivrance de médicaments"
+      }
+    },
+    "stats": {
+      "doctors": "Médecins partenaires",
+      "specialties": "Spécialités médicales",
+      "patients": "Patients satisfaits",
+      "support": "Support disponible"
+    },
+    "cta": {
+      "title": "Prêt à commencer ?",
+      "subtitle": "Rejoignez des milliers d'Algériens qui font confiance à Dawini pour leur santé",
+      "createAccount": "Créer un compte"
+    },
+    "trust": {
+      "title": "Pourquoi choisir Dawini ?",
+      "security": {
+        "title": "Sécurisé et confidentiel",
+        "description": "Vos données médicales sont protégées par un cryptage de niveau bancaire"
+      },
+      "availability": {
+        "title": "Disponible 24/7",
+        "description": "Accédez à vos informations de santé à tout moment, où que vous soyez"
+      },
+      "verified": {
+        "title": "Médecins vérifiés",
+        "description": "Tous nos médecins partenaires sont certifiés et vérifiés"
+      }
+    }
+  },
+  "actions": {
+    "search": "Rechercher des médecins",
+    "login": "Connexion",
+    "logout": "Déconnexion"
+  },
+  "about": {
+    "hero": {
+      "title": "À propos de Dawini",
+      "subtitle": "Votre plateforme de santé numérique de confiance en Algérie"
+    },
+    "mission": {
+      "title": "Notre Mission",
+      "subtitle": "Rendre les soins de santé accessibles, simples et efficaces",
+      "description": "Dawini est une plateforme de santé numérique en Algérie qui connecte les patients, les médecins et les pharmaciens. Les patients peuvent facilement prendre rendez-vous, les médecins peuvent gérer les consultations et les ordonnances, et les pharmaciens peuvent valider les ordonnances en toute sécurité. L'objectif est de rendre les soins de santé plus accessibles, simples et efficaces.",
+      "vision": "Notre Vision",
+      "visionText": "Révolutionner les soins de santé en Algérie en créant un écosystème numérique transparent qui autonomise les patients, soutient les professionnels de la santé et améliore les résultats de santé globaux."
+    },
+    "values": {
+      "accessibility": "Rendre les soins de santé accessibles à tous",
+      "security": "Protéger les données des patients avec une sécurité de niveau bancaire",
+      "innovation": "Exploiter la technologie pour améliorer les soins de santé",
+      "community": "Construire une communauté de santé solide"
+    },
+    "features": {
+      "title": "Pourquoi choisir Dawini ?",
+      "subtitle": "Nous fournissons des solutions de santé complètes adaptées à l'Algérie",
+      "community": {
+        "title": "Communauté Connectée",
+        "description": "Connectez-vous avec des médecins et pharmaciens vérifiés à travers l'Algérie"
+      },
+      "security": {
+        "title": "Sécurisé et Privé",
+        "description": "Vos données médicales sont protégées par un cryptage avancé"
+      },
+      "accessibility": {
+        "title": "Accès 24/7",
+        "description": "Accédez à vos informations de santé à tout moment, n'importe où"
+      },
+      "care": {
+        "title": "Soins de Qualité",
+        "description": "Professionnels de la santé vérifiés engagés pour votre bien-être"
+      }
+    },
+    "stats": {
+      "title": "Notre Impact",
+      "subtitle": "Des chiffres qui témoignent de notre engagement envers la santé",
+      "doctors": "Médecins Partenaires",
+      "specialties": "Spécialités Médicales",
+      "patients": "Patients Satisfaits",
+      "support": "Support Disponible"
+    },
+    "cta": {
+      "title": "Rejoignez la Révolution de la Santé",
+      "subtitle": "Soyez partie de la plateforme de santé la plus fiable d'Algérie",
+      "join": "Commencer Aujourd'hui"
+    }
+  },
+  "contact": {
+    "hero": {
+      "title": "Contactez-nous",
+      "subtitle": "Nous sommes là pour vous aider et répondre à toutes vos questions"
+    },
+    "info": {
+      "title": "Informations de Contact",
+      "subtitle": "Contactez-nous par l'un de ces canaux",
+      "email": {
+        "title": "Email"
+      },
+      "phone": {
+        "title": "Téléphone"
+      },
+      "address": {
+        "title": "Adresse",
+        "value": "Alger, Algérie"
+      },
+      "hours": {
+        "title": "Heures d'Ouverture",
+        "value": "Support 24/7 Disponible"
+      }
+    },
+    "social": {
+      "title": "Suivez-nous"
+    },
+    "form": {
+      "title": "Envoyez-nous un Message",
+      "subtitle": "Remplissez le formulaire ci-dessous et nous vous répondrons dès que possible",
+      "name": "Nom Complet",
+      "email": "Adresse Email",
+      "subject": "Sujet",
+      "message": "Message",
+      "submit": "Envoyer le Message"
+    },
+    "faq": {
+      "title": "Questions Fréquemment Posées",
+      "subtitle": "Trouvez des réponses aux questions courantes sur notre plateforme",
+      "question1": "Comment prendre un rendez-vous ?",
+      "answer1": "Recherchez simplement un médecin par spécialité et localisation, puis sélectionnez un créneau horaire disponible pour réserver votre rendez-vous.",
+      "question2": "Mes données médicales sont-elles sécurisées ?",
+      "answer2": "Oui, nous utilisons un cryptage de niveau bancaire pour protéger toutes vos informations médicales et garantir une confidentialité totale.",
+      "question3": "Puis-je accéder à mes ordonnances en ligne ?",
+      "answer3": "Absolument ! Toutes vos ordonnances sont stockées en toute sécurité dans votre tableau de bord patient et peuvent être consultées à tout moment.",
+      "question4": "Comment devenir médecin partenaire ?",
+      "answer4": "Contactez-nous via le formulaire ci-dessus ou envoyez-nous un email directement pour en savoir plus sur notre programme de partenariat."
+    }
+  }
+}

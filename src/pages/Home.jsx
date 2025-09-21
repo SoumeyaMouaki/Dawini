@@ -52,15 +52,15 @@ export default function Home() {
       {/* Hero Section */}
       <section className="relative bg-gradient-to-br from-primary-600 via-primary-700 to-primary-800 text-white overflow-hidden">
         {/* Background Pattern */}
-        <div className="absolute inset-0 bg-[url('/hero-bg.jpg')] bg-cover bg-center opacity-20"></div>
-        <div className="absolute inset-0 bg-gradient-to-br from-primary-600/90 via-primary-700/90 to-primary-800/90"></div>
+        <div className="absolute inset-0 bg-[url('/bg3.jpg')] bg-cover bg-center opacity-90"></div>
+       
         
         <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20 lg:py-32">
           <div className="text-center max-w-4xl mx-auto">
-            <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold mb-6 leading-tight">
+            <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold text-primary-100 mb-6 leading-tight">
               {t('hero.title')}
             </h1>
-            <p className="text-xl md:text-2xl text-primary-100 mb-12 max-w-3xl mx-auto">
+            <p className="text-xl md:text-2xl text-primary-200 font-bold mb-12 max-w-3xl mx-auto">
               {t('hero.subtitle')}
             </p>
 
@@ -75,7 +75,8 @@ export default function Home() {
                       placeholder={t('hero.search.specialty')}
                       value={specialty}
                       onChange={(e) => setSpecialty(e.target.value)}
-                      className="input pl-12"
+                      className="input w-full text-gray-900 placeholder-gray-400 font-semibold"
+                      style={{paddingLeft: '40px'}}
                     />
                   </div>
                   <div className="relative">
@@ -85,7 +86,8 @@ export default function Home() {
                       placeholder={t('hero.search.location')}
                       value={location}
                       onChange={(e) => setLocation(e.target.value)}
-                      className="input pl-12"
+                      className="input w-full text-gray-900 placeholder-gray-400 font-semibold"
+                      style={{paddingLeft: '40px'}}
                     />
                   </div>
                   <div className="relative">
@@ -94,7 +96,9 @@ export default function Home() {
                       type="date"
                       value={date}
                       onChange={(e) => setDate(e.target.value)}
-                      className="input pl-12"
+                      className="input w-full text-gray-900 placeholder-gray-400"
+                      style={{paddingLeft: '40px'}}
+
                     />
                   </div>
                 </div>

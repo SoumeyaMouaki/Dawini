@@ -6,6 +6,7 @@ import PatientDashboard from './pages/PatientDashboard.jsx'
 import DoctorDashboard from './pages/DoctorDashboard.jsx'
 import PharmacyDashboard from './pages/PharmacyDashboard.jsx'
 import Prescriptions from './pages/Prescriptions.jsx'
+import Messages from './pages/Messages.jsx'
 import About from './pages/About.jsx'
 import Contact from './pages/Contact.jsx'
 import Login from './pages/Login.jsx'
@@ -43,7 +44,14 @@ export default function App() {
                 </ProtectedRoute>
               }
             />
-            
+                     <Route
+              path="/messages"
+              element={
+                <ProtectedRoute>
+                  <Messages />
+                </ProtectedRoute>
+              }
+            />
             {/* Doctor Routes */}
             <Route
               path="/doctor/dashboard"
@@ -53,6 +61,7 @@ export default function App() {
                 </ProtectedRoute>
               }
             />
+   
             
             {/* Pharmacy Routes */}
             <Route

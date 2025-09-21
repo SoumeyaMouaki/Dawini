@@ -3,6 +3,8 @@ import api from '../api/axios.js'
 import Card from '../components/Card.jsx'
 import { useAuth } from '../context/AuthContext.jsx'
 import { Calendar, Clock, User, Stethoscope, Search, Plus, FileText, MapPin } from 'lucide-react'
+import L from 'leaflet'
+import { useState } from 'react'
 
 function AppointmentItem({ appointment }) {
   const getStatusColor = (status) => {
@@ -53,16 +55,66 @@ function AppointmentItem({ appointment }) {
 
 export default function PatientDashboard() {
   const { user } = useAuth()
+  const [isBookingOpen, setIsBookingOpen] = useState(false)
+  const [isMedicalOpen, setIsMedicalOpen] = useState(false)
+  const [booking, setBooking] = useState({ doctorId: '', date: '', time: '', reason: '' })
+  const [medical, setMedical] = useState({ allergies: [], chronicConditions: [] })
+  const [doctors, setDoctors] = useState([])
+  const [search, setSearch] = useState({ specialization: '', wilaya: '', commune: '', date: '', time: '' })
+  const [mapInstance, setMapInstance] = useState(null)
+  const [markers, setMarkers] = useState([])
 
   const { data, isLoading, isError } = useQuery({
-    queryKey: ['appointments', user?.id],
+    queryKey: ['appointments', user?.id || user?._id],
     queryFn: async () => {
       // Expected backend: GET /api/patients/:id/appointments
-      const { data } = await api.get(`/api/patients/${user.id}/appointments`)
+      const userId = user?.id || user?._id
+      const { data } = await api.get(`/api/patients/${userId}/appointments`)
       return data
     },
-    enabled: !!user
+    enabled: Boolean(user && (user.id || user._id))
   })
+  
+  const { data: doctorsData } = useQuery({
+    queryKey: ['doctors-basic'],
+    queryFn: async () => {
+      const { data } = await api.get('/api/doctors?available=true&limit=50')
+      return data.doctors || []
+    }
+  })
+  
+  if (doctors !== doctorsData) {
+    if (Array.isArray(doctorsData)) setDoctors(doctorsData)
+  }
+
+  const runSearch = async (e) => {
+    e && e.preventDefault()
+    const userId = user.id || user._id
+    const params = new URLSearchParams()
+    if (search.specialization) params.append('specialization', search.specialization)
+    if (search.wilaya) params.append('wilaya', search.wilaya)
+    if (search.commune) params.append('commune', search.commune)
+    if (search.date) params.append('date', search.date)
+    if (search.time) params.append('time', search.time)
+    const { data } = await api.get(`/api/patients/${userId}/doctors/search?${params.toString()}`)
+    const found = data.doctors || []
+    setDoctors(found)
+    // plot on map
+    if (mapInstance) {
+      markers.forEach(m => m.remove())
+      const newMarkers = []
+      found.forEach(d => {
+        const lat = d.address?.coordinates?.latitude || d.userId?.address?.lat
+        const lng = d.address?.coordinates?.longitude || d.userId?.address?.lng
+        if (typeof lat === 'number' && typeof lng === 'number') {
+          const marker = L.marker([lat, lng]).addTo(mapInstance).bindPopup(`<b>${d.userId?.fullName || ''}</b><br/>${d.specialization || ''}`)
+          newMarkers.push(marker)
+        }
+      })
+      setMarkers(newMarkers)
+    }
+  }
+console.log(data);
 
   if (!user) {
     return (
@@ -101,8 +153,22 @@ export default function PatientDashboard() {
     )
   }
 
-  const upcoming = (data || []).filter(a => a.status === 'upcoming' || a.status === 'confirmed')
-  const past = (data || []).filter(a => a.status === 'completed' || a.status === 'cancelled')
+  const upcoming = (data.appointments || []).filter(a => a.status === 'upcoming' || a.status === 'confirmed')
+  const past = (data.appointments || []).filter(a => a.status === 'completed' || a.status === 'cancelled')
+
+  // Initialize Leaflet map once
+  if (!mapInstance) {
+    setTimeout(() => {
+      try {
+        const map = L.map('map').setView([36.75, 3.06], 10)
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+          maxZoom: 19,
+          attribution: '&copy; OpenStreetMap'
+        }).addTo(map)
+        setMapInstance(map)
+      } catch {}
+    }, 0)
+  }
 
   return (
     <div className="min-h-screen bg-secondary-50">
@@ -123,7 +189,7 @@ export default function PatientDashboard() {
                 <Search className="w-4 h-4 mr-2" />
                 Rechercher
               </button>
-              <button className="btn btn-sm">
+              <button onClick={() => setIsBookingOpen(true)} className="btn btn-sm">
                 <Plus className="w-4 h-4 mr-2" />
                 Nouveau RDV
               </button>
@@ -158,6 +224,23 @@ export default function PatientDashboard() {
           </div>
         </div>
 
+        {/* Search + Map */}
+        <div className="grid lg:grid-cols-3 gap-8 mb-8">
+          <Card title="Rechercher un médecin">
+            <form onSubmit={runSearch} className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <input className="input" placeholder="Spécialité" value={search.specialization} onChange={e => setSearch({ ...search, specialization: e.target.value })} />
+              <input className="input" placeholder="Wilaya" value={search.wilaya} onChange={e => setSearch({ ...search, wilaya: e.target.value })} />
+              <input className="input" placeholder="Commune" value={search.commune} onChange={e => setSearch({ ...search, commune: e.target.value })} />
+              <input type="date" className="input" value={search.date} onChange={e => setSearch({ ...search, date: e.target.value })} />
+              <input type="time" className="input" value={search.time} onChange={e => setSearch({ ...search, time: e.target.value })} />
+              <div className="md:col-span-2 flex justify-end"><button type="submit" className="btn btn-sm"><Search className="w-4 h-4 mr-2"/>Chercher</button></div>
+            </form>
+          </Card>
+          <div className="lg:col-span-2">
+            <div id="map" className="w-full h-80 rounded-2xl border border-secondary-200"></div>
+          </div>
+        </div>
+
         {/* Appointments */}
         <div className="grid lg:grid-cols-2 gap-8">
           <Card title="Rendez-vous à venir">
@@ -165,7 +248,7 @@ export default function PatientDashboard() {
               <div className="text-center py-8">
                 <Calendar className="w-12 h-12 text-secondary-400 mx-auto mb-4" />
                 <p className="text-secondary-500">Aucun rendez-vous à venir</p>
-                <button className="btn btn-sm mt-4">
+                <button onClick={() => setIsBookingOpen(true)} className="btn btn-sm mt-4">
                   <Plus className="w-4 h-4 mr-2" />
                   Prendre un RDV
                 </button>
@@ -195,6 +278,89 @@ export default function PatientDashboard() {
           </Card>
         </div>
       </div>
+
+      {/* Medical details */}
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-12">
+        <div className="mt-8">
+          <Card title="Dossier médical">
+            <div className="flex items-center justify-between">
+              <p className="text-secondary-600">Gérez vos allergies et maladies chroniques</p>
+              <button onClick={() => setIsMedicalOpen(true)} className="btn btn-sm">Mettre à jour</button>
+            </div>
+          </Card>
+        </div>
+      </div>
+
+      {/* Booking Modal */}
+      {isBookingOpen && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center p-4 z-50">
+          <div className="card w-full max-w-lg">
+            <h3 className="text-lg font-semibold text-secondary-900 mb-4">Prendre un rendez-vous</h3>
+            <div className="space-y-4">
+              <div>
+                <label className="label">Médecin</label>
+                <select className="input" value={booking.doctorId} onChange={e => setBooking({ ...booking, doctorId: e.target.value })}>
+                  <option value="">Sélectionner un médecin</option>
+                  {doctors.map(d => (
+                    <option key={d._id} value={d._id}>{d.userId?.fullName} • {d.specialization}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="label">Date</label>
+                  <input type="date" className="input" value={booking.date} onChange={e => setBooking({ ...booking, date: e.target.value })} />
+                </div>
+                <div>
+                  <label className="label">Heure</label>
+                  <input type="time" className="input" value={booking.time} onChange={e => setBooking({ ...booking, time: e.target.value })} />
+                </div>
+              </div>
+              <div>
+                <label className="label">Motif</label>
+                <input type="text" className="input" placeholder="Ex: Consultation" value={booking.reason} onChange={e => setBooking({ ...booking, reason: e.target.value })} />
+              </div>
+              <div className="flex justify-end gap-3">
+                <button onClick={() => setIsBookingOpen(false)} className="btn-outline btn-sm">Annuler</button>
+                <button onClick={async () => {
+                  const payload = { patientId: user.id || user._id, doctorId: booking.doctorId, date: booking.date, time: booking.time, reason: booking.reason }
+                  await api.post('/api/appointments', payload)
+                  setIsBookingOpen(false)
+                  window.location.reload()
+                }} className="btn btn-sm">Confirmer</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Medical Modal */}
+      {isMedicalOpen && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center p-4 z-50">
+          <div className="card w-full max-w-lg">
+            <h3 className="text-lg font-semibold text-secondary-900 mb-4">Détails médicaux</h3>
+            <div className="space-y-4">
+              <div>
+                <label className="label">Allergies (séparées par des virgules)</label>
+                <input className="input" value={medical.allergies.join(', ')} onChange={e => setMedical({ ...medical, allergies: e.target.value.split(',').map(s => s.trim()).filter(Boolean) })} />
+              </div>
+              <div>
+                <label className="label">Maladies chroniques (séparées par des virgules)</label>
+                <input className="input" value={medical.chronicConditions.join(', ')} onChange={e => setMedical({ ...medical, chronicConditions: e.target.value.split(',').map(s => s.trim()).filter(Boolean) })} />
+              </div>
+              <div className="flex justify-end gap-3">
+                <button onClick={() => setIsMedicalOpen(false)} className="btn-outline btn-sm">Annuler</button>
+                <button onClick={async () => {
+                  const userId = user.id || user._id
+                  await api.put(`/api/patients/${userId}/profile`, medical)
+                  setIsMedicalOpen(false)
+                }} className="btn btn-sm">Enregistrer</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
+ 

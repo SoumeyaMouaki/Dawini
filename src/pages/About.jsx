@@ -1,8 +1,10 @@
 import { useTranslation } from 'react-i18next'
 import { Heart, Shield, Users, Clock, Star, ArrowRight, CheckCircle } from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
 
 export default function About() {
   const { t } = useTranslation()
+  const navigate = useNavigate()
 
   const features = [
     {
@@ -175,7 +177,7 @@ export default function About() {
             {t('about.cta.subtitle')}
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <button className="btn btn-lg bg-white text-primary-600 hover:bg-primary-50">
+            <button onClick={() => navigate('/register')} className="btn btn-lg bg-white text-primary-600 hover:bg-primary-50">
               {t('about.cta.join')}
               <ArrowRight className="w-5 h-5 ml-2" />
             </button>

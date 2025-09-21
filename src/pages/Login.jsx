@@ -21,8 +21,10 @@ export default function Login() {
   const onSubmit = async (values) => {
     try {
       setError('')
-      await login(values.email, values.password)
-      // Redirect will be handled by the auth context based on user type
+      const loggedInUser = await login(values.email, values.password)
+      if (loggedInUser?.userType === 'patient') navigate('/patient/dashboard', { replace: true })
+      else if (loggedInUser?.userType === 'doctor') navigate('/doctor/dashboard', { replace: true })
+      else if (loggedInUser?.userType === 'pharmacist') navigate('/pharmacy/dashboard', { replace: true })
     } catch (e) {
       setError('Échec de la connexion. Veuillez vérifier vos identifiants.')
     }

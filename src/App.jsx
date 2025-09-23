@@ -2,6 +2,7 @@ import { Routes, Route, Navigate } from 'react-router-dom'
 import Navbar from './components/Navbar.jsx'
 import Home from './pages/Home.jsx'
 import Register from './pages/Register.jsx'
+import SearchResults from './pages/SearchResults.jsx'
 import PatientDashboard from './pages/PatientDashboard.jsx'
 import DoctorDashboard from './pages/DoctorDashboard.jsx'
 import PharmacyDashboard from './pages/PharmacyDashboard.jsx'
@@ -10,6 +11,7 @@ import Messages from './pages/Messages.jsx'
 import About from './pages/About.jsx'
 import Contact from './pages/Contact.jsx'
 import Login from './pages/Login.jsx'
+import TestPage from './pages/TestPage.jsx'
 import ProtectedRoute from './routes/ProtectedRoute.jsx'
 import { AuthProvider } from './context/AuthContext.jsx'
 import './i18n.js'
@@ -22,10 +24,12 @@ export default function App() {
         <main>
           <Routes>
             <Route path="/" element={<Home />} />
+            <Route path="/search" element={<SearchResults />} />
             <Route path="/about" element={<About />} />
             <Route path="/contact" element={<Contact />} />
             <Route path="/login" element={<Login />} />
             <Route path="/register" element={<Register />} />
+            <Route path="/test" element={<TestPage />} />
             
             {/* Patient Routes */}
             <Route
@@ -44,7 +48,7 @@ export default function App() {
                 </ProtectedRoute>
               }
             />
-                     <Route
+            <Route
               path="/messages"
               element={
                 <ProtectedRoute>
@@ -61,7 +65,6 @@ export default function App() {
                 </ProtectedRoute>
               }
             />
-   
             
             {/* Pharmacy Routes */}
             <Route

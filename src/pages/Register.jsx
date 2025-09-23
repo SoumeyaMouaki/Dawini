@@ -3,7 +3,7 @@ import { useNavigate, Link } from "react-router-dom";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { Eye, EyeOff, User, Stethoscope, Pill, ArrowLeft, Mail, Lock, Phone, MapPin, Calendar, FileText } from "lucide-react";
+import { Eye, EyeOff, User, Stethoscope, Pill, ArrowLeft, Mail, Lock, Phone, MapPin, Calendar, FileText, Navigation } from "lucide-react";
 import api from "../api/axios.js";
 
 // Validation schemas
@@ -16,7 +16,11 @@ const baseUserSchema = z.object({
     wilaya: z.string().min(1, "La wilaya est requise"),
     commune: z.string().min(1, "La commune est requise"),
     street: z.string().optional(),
-    postalCode: z.string().optional()
+    postalCode: z.string().optional(),
+    coordinates: z.object({
+      lat: z.number().optional(),
+      lng: z.number().optional()
+    }).optional()
   })
 });
 
@@ -52,6 +56,8 @@ export default function Register() {
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
+  const [isGettingLocation, setIsGettingLocation] = useState(false);
+  const [locationError, setLocationError] = useState("");
   const navigate = useNavigate();
 
   const {
@@ -68,7 +74,11 @@ export default function Register() {
         wilaya: "",
         commune: "",
         street: "",
-        postalCode: ""
+        postalCode: "",
+        coordinates: {
+          lat: undefined,
+          lng: undefined
+        }
       }
     }
   });
@@ -125,6 +135,48 @@ export default function Register() {
     setUserType(newType);
     setValue("userType", newType);
     setError("");
+  };
+
+  const getCurrentLocation = () => {
+    if (!navigator.geolocation) {
+      setLocationError("La géolocalisation n'est pas supportée par votre navigateur");
+      return;
+    }
+
+    setIsGettingLocation(true);
+    setLocationError("");
+
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        const { latitude, longitude } = position.coords;
+        setValue("address.coordinates.lat", latitude);
+        setValue("address.coordinates.lng", longitude);
+        setIsGettingLocation(false);
+        setLocationError("");
+      },
+      (error) => {
+        setIsGettingLocation(false);
+        switch (error.code) {
+          case error.PERMISSION_DENIED:
+            setLocationError("L'accès à la géolocalisation a été refusé");
+            break;
+          case error.POSITION_UNAVAILABLE:
+            setLocationError("Les informations de localisation ne sont pas disponibles");
+            break;
+          case error.TIMEOUT:
+            setLocationError("La demande de localisation a expiré");
+            break;
+          default:
+            setLocationError("Une erreur inconnue s'est produite");
+            break;
+        }
+      },
+      {
+        enableHighAccuracy: true,
+        timeout: 10000,
+        maximumAge: 300000
+      }
+    );
   };
 
   return (
@@ -281,42 +333,94 @@ export default function Register() {
             </div>
 
             {/* Address Information */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div>
-                <label className="label">
-                  <MapPin className="w-4 h-4 inline mr-2" />
-                  Wilaya *
-                </label>
-                <select
-                  {...register("address.wilaya")}
-                  className={`input ${errors.address?.wilaya ? 'input-error' : ''}`}
+            <div className="space-y-6">
+              <div className="flex items-center justify-between">
+                <h3 className="text-lg font-semibold text-secondary-900 flex items-center">
+                  <MapPin className="w-5 h-5 mr-2" />
+                  Adresse
+                </h3>
+                <button
+                  type="button"
+                  onClick={getCurrentLocation}
+                  disabled={isGettingLocation}
+                  className="btn-outline btn-sm flex items-center"
                 >
-                  <option value="">Sélectionnez une wilaya</option>
-                  {wilayas.map((wilaya) => (
-                    <option key={wilaya} value={wilaya}>
-                      {wilaya}
-                    </option>
-                  ))}
-                </select>
-                {errors.address?.wilaya && (
-                  <p className="text-error-600 text-sm mt-1">{errors.address.wilaya.message}</p>
-                )}
+                  <Navigation className="w-4 h-4 mr-2" />
+                  {isGettingLocation ? "Localisation..." : "Utiliser ma position"}
+                </button>
               </div>
 
-              <div>
-                <label className="label">
-                  <MapPin className="w-4 h-4 inline mr-2" />
-                  Commune *
-                </label>
-                <input
-                  type="text"
-                  {...register("address.commune")}
-                  className={`input ${errors.address?.commune ? 'input-error' : ''}`}
-                  placeholder="Nom de la commune"
-                />
-                {errors.address?.commune && (
-                  <p className="text-error-600 text-sm mt-1">{errors.address.commune.message}</p>
-                )}
+              {locationError && (
+                <div className="bg-warning-50 border border-warning-200 text-warning-700 px-4 py-3 rounded-lg">
+                  {locationError}
+                </div>
+              )}
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                  <label className="label">
+                    <MapPin className="w-4 h-4 inline mr-2" />
+                    Wilaya *
+                  </label>
+                  <select
+                    {...register("address.wilaya")}
+                    className={`input ${errors.address?.wilaya ? 'input-error' : ''}`}
+                  >
+                    <option value="">Sélectionnez une wilaya</option>
+                    {wilayas.map((wilaya) => (
+                      <option key={wilaya} value={wilaya}>
+                        {wilaya}
+                      </option>
+                    ))}
+                  </select>
+                  {errors.address?.wilaya && (
+                    <p className="text-error-600 text-sm mt-1">{errors.address.wilaya.message}</p>
+                  )}
+                </div>
+
+                <div>
+                  <label className="label">
+                    <MapPin className="w-4 h-4 inline mr-2" />
+                    Commune *
+                  </label>
+                  <input
+                    type="text"
+                    {...register("address.commune")}
+                    className={`input ${errors.address?.commune ? 'input-error' : ''}`}
+                    placeholder="Nom de la commune"
+                  />
+                  {errors.address?.commune && (
+                    <p className="text-error-600 text-sm mt-1">{errors.address.commune.message}</p>
+                  )}
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                  <label className="label">
+                    <MapPin className="w-4 h-4 inline mr-2" />
+                    Rue (optionnel)
+                  </label>
+                  <input
+                    type="text"
+                    {...register("address.street")}
+                    className="input"
+                    placeholder="Numéro et nom de rue"
+                  />
+                </div>
+
+                <div>
+                  <label className="label">
+                    <MapPin className="w-4 h-4 inline mr-2" />
+                    Code postal (optionnel)
+                  </label>
+                  <input
+                    type="text"
+                    {...register("address.postalCode")}
+                    className="input"
+                    placeholder="Code postal"
+                  />
+                </div>
               </div>
             </div>
 

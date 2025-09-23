@@ -4,6 +4,7 @@ import { Menu, X, User, Stethoscope, Pill, LogOut, ChevronDown } from "lucide-re
 import { useState } from "react";
 import LanguageSwitch from "./LanguageSwitch.jsx";
 
+
 export default function Navbar() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
@@ -51,18 +52,17 @@ export default function Navbar() {
   };
 
   return (
-    <header className="bg-white shadow-sm sticky top-0 z-50 border-b border-secondary-100">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex items-center justify-between h-16">
-          {/* Logo */}
-          <Link to="/" className="flex items-center gap-3 group">
-            <div className="w-10 h-10 bg-primary-600 rounded-xl flex items-center justify-center group-hover:bg-primary-700 transition-colors duration-200">
-              <span className="text-white font-bold text-lg">D</span>
-            </div>
-            <span className="text-2xl font-bold text-secondary-900 group-hover:text-primary-600 transition-colors duration-200">
-              Dawini
-            </span>
-          </Link>
+    <header className="sticky top-0 z-50 w-full">
+      <div className="w-full px-4 sm:px-6 lg:px-8">
+        <div className="flex items-center justify-between h-16 rounded-2xl mt-3 mb-3 px-6 bg-white/70 backdrop-blur-md border border-secondary-100 shadow-glass">
+{/* Logo */}
+<Link to="/" className="flex items-center group">
+  <span className="text-3xl font-extrabold font-sans tracking-tight italic">
+    <span className="text-primary-600 group-hover:text-primary-700 transition-colors duration-200">D</span>
+    <span className="text-sky-500 group-hover:text-primary-600 transition-colors duration-200">awini</span>
+  </span>
+</Link>
+
 
           {/* Desktop Navigation */}
           <nav className="hidden md:flex items-center gap-2">
@@ -81,7 +81,7 @@ export default function Navbar() {
               <div className="flex items-center gap-2 ml-4 pl-4 border-l border-secondary-200">
                 <button
                   onClick={() => navigate("/register")}
-                  className="btn btn-sm"
+                  className="btn btn-sm shadow-sm"
                 >
                   <User className="w-4 h-4 mr-2" />
                   S'inscrire
@@ -121,7 +121,7 @@ export default function Navbar() {
                   </button>
 
                   {isUserMenuOpen && (
-                    <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border border-secondary-200 py-1 z-50">
+                    <div className="absolute right-0 mt-2 w-56 bg-white/90 backdrop-blur-md rounded-xl shadow-elevated border border-secondary-200 py-2 z-50">
                       <div className="px-4 py-2 border-b border-secondary-100">
                         <p className="text-sm font-medium text-secondary-900">{user.fullName}</p>
                         <p className="text-xs text-secondary-500">{roleInfo.label}</p>
@@ -159,7 +159,7 @@ export default function Navbar() {
 
         {/* Mobile Navigation */}
         {isMenuOpen && (
-          <div className="md:hidden border-t border-secondary-100 py-4">
+          <div className="md:hidden border-t border-secondary-100 py-4 bg-white/80 backdrop-blur-md rounded-2xl shadow-glass mx-3">
             <nav className="space-y-2">
               <NavLink
                 to="/"

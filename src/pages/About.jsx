@@ -50,10 +50,11 @@ export default function About() {
   return (
     <div className="min-h-screen bg-secondary-50">
       {/* Hero Section */}
-      <section className="bg-gradient-to-br from-primary-600 via-primary-700 to-primary-800 text-white py-20">
+      <section className="relative overflow-hidden text-white py-20 bg-primary-700">
+        <div className="absolute inset-0 opacity-30 bg-gradient-radial from-primary-400 via-primary-600 to-primary-800" />
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center max-w-4xl mx-auto">
-            <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold mb-6">
+            <h1 className="text-4xl md:text-5xl lg:text-6xl text-primary-100 font-bold mb-6">
               {t('about.hero.title')}
             </h1>
             <p className="text-xl md:text-2xl text-primary-100 mb-8">
@@ -90,9 +91,9 @@ export default function About() {
                 ))}
               </div>
             </div>
-            <div className="bg-gradient-to-br from-primary-50 to-secondary-50 rounded-2xl p-8">
+            <div className="bg-white/80 backdrop-blur-md rounded-2xl p-8 shadow-elevated border border-secondary-100">
               <div className="text-center">
-                <div className="w-24 h-24 bg-primary-600 rounded-full flex items-center justify-center mx-auto mb-6">
+                <div className="w-24 h-24 bg-primary-600 rounded-full flex items-center justify-center mx-auto mb-6 drop-shadow-glow">
                   <Heart className="w-12 h-12 text-white" />
                 </div>
                 <h4 className="text-xl font-semibold text-secondary-900 mb-4">
@@ -124,7 +125,7 @@ export default function About() {
               const Icon = feature.icon
               return (
                 <div key={index} className="text-center group">
-                  <div className={`w-16 h-16 mx-auto mb-6 rounded-2xl bg-${feature.color}-100 flex items-center justify-center group-hover:scale-110 transition-transform duration-200`}>
+                  <div className={`w-16 h-16 mx-auto mb-6 rounded-2xl bg-${feature.color}-100 flex items-center justify-center group-hover:scale-110 transition-transform duration-200 shadow-soft`}>
                     <Icon className={`w-8 h-8 text-${feature.color}-600`} />
                   </div>
                   <h3 className="text-xl font-semibold text-secondary-900 mb-3">
@@ -168,7 +169,8 @@ export default function About() {
       </section>
 
       {/* CTA Section */}
-      <section className="py-20 bg-primary-600">
+      <section className="py-20 bg-primary-600 relative overflow-hidden">
+        <div className="absolute inset-0 opacity-20 bg-gradient-conic from-white via-primary-300 to-primary-700" />
         <div className="max-w-4xl mx-auto text-center px-4 sm:px-6 lg:px-8">
           <h2 className="text-3xl md:text-4xl font-bold text-white mb-6">
             {t('about.cta.title')}
@@ -177,7 +179,7 @@ export default function About() {
             {t('about.cta.subtitle')}
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <button onClick={() => navigate('/register')} className="btn btn-lg bg-white text-primary-600 hover:bg-primary-50">
+            <button onClick={() => navigate('/register')} className="btn btn-lg bg-white text-primary-600 hover:bg-primary-50 shadow-elevated">
               {t('about.cta.join')}
               <ArrowRight className="w-5 h-5 ml-2" />
             </button>

@@ -21,11 +21,25 @@ export default function Login() {
   const onSubmit = async (values) => {
     try {
       setError('')
+      console.log('Login: Attempting login with', values.email)
       const loggedInUser = await login(values.email, values.password)
-      if (loggedInUser?.userType === 'patient') navigate('/patient/dashboard', { replace: true })
-      else if (loggedInUser?.userType === 'doctor') navigate('/doctor/dashboard', { replace: true })
-      else if (loggedInUser?.userType === 'pharmacist') navigate('/pharmacy/dashboard', { replace: true })
+      console.log('Login: Login successful, user data:', loggedInUser)
+      
+      if (loggedInUser?.userType === 'patient') {
+        console.log('Login: Redirecting to patient dashboard')
+        navigate('/patient/dashboard', { replace: true })
+      } else if (loggedInUser?.userType === 'doctor') {
+        console.log('Login: Redirecting to doctor dashboard')
+        navigate('/doctor/dashboard', { replace: true })
+      } else if (loggedInUser?.userType === 'pharmacist') {
+        console.log('Login: Redirecting to pharmacy dashboard')
+        navigate('/pharmacy/dashboard', { replace: true })
+      } else {
+        console.log('Login: Unknown user type, redirecting to patient dashboard as default')
+        navigate('/patient/dashboard', { replace: true })
+      }
     } catch (e) {
+      console.error('Login: Login failed', e)
       setError('Échec de la connexion. Veuillez vérifier vos identifiants.')
     }
   }
@@ -155,9 +169,16 @@ export default function Login() {
                 <p className="text-sm text-secondary-600">patient@dawini.com</p>
               </div>
               <button
-                onClick={() => {
+                onClick={async () => {
                   setError('');
-                  login('patient@dawini.com', 'password123');
+                  try {
+                    const loggedInUser = await login('patient@dawini.com', 'password123');
+                    if (loggedInUser?.userType === 'patient') {
+                      navigate('/patient/dashboard', { replace: true });
+                    }
+                  } catch (e) {
+                    setError('Échec de la connexion avec le compte de test patient.');
+                  }
                 }}
                 className="btn btn-sm"
               >

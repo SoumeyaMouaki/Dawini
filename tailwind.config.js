@@ -3,6 +3,16 @@ export default {
   content: ["./index.html", "./src/**/*.{js,jsx,ts,tsx}"],
   theme: {
     extend: {
+      container: {
+        center: true,
+        padding: {
+          DEFAULT: '1rem',
+          sm: '1.5rem',
+          lg: '2rem',
+          xl: '2.5rem',
+          '2xl': '3rem',
+        },
+      },
       colors: {
         // Doctolib-inspired blue palette
         primary: {
@@ -81,7 +91,9 @@ export default {
         soft: "0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06)",
         medium: "0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)",
         large: "0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)",
-        xl: "0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)"
+        xl: "0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)",
+        glass: "0 10px 30px rgba(2, 132, 199, 0.08)",
+        elevated: "0 8px 24px rgba(15, 23, 42, 0.08)",
       },
       borderRadius: {
         xl2: "1rem",
@@ -92,7 +104,23 @@ export default {
         '18': '4.5rem',
         '88': '22rem',
         '128': '32rem'
-      }
+      },
+      backgroundImage: {
+        'gradient-radial': 'radial-gradient(var(--tw-gradient-stops))',
+        'gradient-conic': 'conic-gradient(from 180deg at 50% 50%, var(--tw-gradient-stops))',
+      },
+      dropShadow: {
+        glow: '0 0 10px rgba(56, 189, 248, 0.35)',
+      },
+      keyframes: {
+        float: {
+          '0%, 100%': { transform: 'translateY(0)' },
+          '50%': { transform: 'translateY(-6px)' },
+        },
+      },
+      animation: {
+        float: 'float 6s ease-in-out infinite',
+      },
     },
   },
   plugins: [],

@@ -1,6 +1,9 @@
 import { useTranslation } from 'react-i18next'
-import { Mail, Phone, MapPin, Clock, Instagram, Facebook, MessageCircle, Send } from 'lucide-react'
+import { Mail, Phone, MapPin, Clock, Instagram, Facebook, MessageCircle, Send, CheckCircle, AlertCircle } from 'lucide-react'
 import { useState } from 'react'
+// Leaflet will be loaded dynamically
+let L = null;
+import { useEffect } from 'react'
 
 export default function Contact() {
   const { t } = useTranslation()
@@ -10,6 +13,22 @@ export default function Contact() {
     subject: '',
     message: ''
   })
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [submitStatus, setSubmitStatus] = useState(null) // 'success', 'error', null
+
+  // Load Leaflet dynamically
+  useEffect(() => {
+    const loadLeaflet = async () => {
+      try {
+        const leafletModule = await import('leaflet');
+        L = leafletModule.default;
+        await import('leaflet/dist/leaflet.css');
+      } catch (error) {
+        console.warn('Leaflet not available:', error);
+      }
+    };
+    loadLeaflet();
+  }, []);
 
   const handleInputChange = (e) => {
     setFormData({
@@ -18,11 +37,39 @@ export default function Contact() {
     })
   }
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault()
-    // Handle form submission here
-    console.log('Form submitted:', formData)
+    setIsSubmitting(true)
+    setSubmitStatus(null)
+    
+    try {
+      // Simulate API call
+      await new Promise(resolve => setTimeout(resolve, 2000))
+      setSubmitStatus('success')
+      setFormData({ name: '', email: '', subject: '', message: '' })
+    } catch (error) {
+      setSubmitStatus('error')
+    } finally {
+      setIsSubmitting(false)
+    }
   }
+
+  // Initialize map
+  useEffect(() => {
+    const mapContainer = document.getElementById('contact-map')
+    if (mapContainer && !mapContainer._leaflet_id && L) {
+      const map = L.map('contact-map').setView([36.7538, 3.0588], 13)
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        maxZoom: 19,
+        attribution: '&copy; OpenStreetMap'
+      }).addTo(map)
+      
+      L.marker([36.7538, 3.0588])
+        .addTo(map)
+        .bindPopup('Dawini - Centre Médical<br/>Alger, Algérie')
+        .openPopup()
+    }
+  }, [])
 
   const contactInfo = [
     {
@@ -79,8 +126,9 @@ export default function Contact() {
   return (
     <div className="min-h-screen bg-secondary-50">
       {/* Hero Section */}
-      <section className="bg-gradient-to-br from-primary-600 via-primary-700 to-primary-800 text-white py-20">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <section className="relative bg-gradient-to-br from-primary-600 via-primary-700 to-primary-800 text-white py-20 overflow-hidden">
+        <div className="absolute inset-0 bg-gradient-to-r from-primary-600/90 to-primary-800/90" />
+        <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center max-w-4xl mx-auto">
             <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold mb-6">
               {t('contact.hero.title')}
@@ -164,6 +212,21 @@ export default function Contact() {
               {t('contact.form.subtitle')}
             </p>
 
+            {/* Status Messages */}
+            {submitStatus === 'success' && (
+              <div className="mb-6 p-4 bg-success-50 border border-success-200 rounded-lg flex items-center">
+                <CheckCircle className="w-5 h-5 text-success-600 mr-3" />
+                <p className="text-success-700 font-medium">Message envoyé avec succès !</p>
+              </div>
+            )}
+
+            {submitStatus === 'error' && (
+              <div className="mb-6 p-4 bg-error-50 border border-error-200 rounded-lg flex items-center">
+                <AlertCircle className="w-5 h-5 text-error-600 mr-3" />
+                <p className="text-error-700 font-medium">Erreur lors de l'envoi. Veuillez réessayer.</p>
+              </div>
+            )}
+
             <form onSubmit={handleSubmit} className="space-y-6">
               <div className="grid md:grid-cols-2 gap-6">
                 <div>
@@ -177,6 +240,7 @@ export default function Contact() {
                     onChange={handleInputChange}
                     className="input"
                     required
+                    disabled={isSubmitting}
                   />
                 </div>
                 <div>
@@ -190,6 +254,7 @@ export default function Contact() {
                     onChange={handleInputChange}
                     className="input"
                     required
+                    disabled={isSubmitting}
                   />
                 </div>
               </div>
@@ -205,6 +270,7 @@ export default function Contact() {
                   onChange={handleInputChange}
                   className="input"
                   required
+                  disabled={isSubmitting}
                 />
               </div>
 
@@ -219,14 +285,43 @@ export default function Contact() {
                   rows={6}
                   className="input resize-none"
                   required
+                  disabled={isSubmitting}
                 ></textarea>
               </div>
 
-              <button type="submit" className="btn w-full">
-                <Send className="w-5 h-5 mr-2" />
-                {t('contact.form.submit')}
+              <button 
+                type="submit" 
+                className="btn w-full"
+                disabled={isSubmitting}
+              >
+                {isSubmitting ? (
+                  <>
+                    <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2"></div>
+                    Envoi en cours...
+                  </>
+                ) : (
+                  <>
+                    <Send className="w-5 h-5 mr-2" />
+                    {t('contact.form.submit')}
+                  </>
+                )}
               </button>
             </form>
+          </div>
+        </div>
+
+        {/* Map Section */}
+        <div className="mt-16">
+          <div className="text-center mb-8">
+            <h2 className="text-3xl font-bold text-secondary-900 mb-4">
+              Notre Localisation
+            </h2>
+            <p className="text-lg text-secondary-600">
+              Trouvez-nous facilement à Alger
+            </p>
+          </div>
+          <div className="card p-0 overflow-hidden">
+            <div id="contact-map" className="w-full h-96 rounded-2xl"></div>
           </div>
         </div>
 

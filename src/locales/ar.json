@@ -1,0 +1,171 @@
+{
+  "nav": {
+    "home": "الرئيسية",
+    "about": "حول",
+    "contact": "اتصل بنا",
+    "dashboard": "لوحة التحكم"
+  },
+  "hero": {
+    "title": "شريكك الصحي في الجزائر",
+    "subtitle": "احجز مواعيد، واحصل على وصفاتك الطبية، وأدر صحتك في مكان واحد.",
+    "search": {
+      "specialty": "التخصص (مثال: أمراض القلب)",
+      "location": "الموقع (الولاية/البلدية)"
+    },
+    "features": {
+      "title": "كيف يعمل؟",
+      "subtitle": "منصة بسيطة وآمنة لجميع احتياجاتك الصحية",
+      "learnMore": "اعرف المزيد",
+      "findDoctor": {
+        "title": "ابحث عن طبيب",
+        "description": "ابحث حسب التخصص والموقع والتوفر"
+      },
+      "prescriptions": {
+        "title": "الوصفات الإلكترونية",
+        "description": "احصل على وصفاتك الطبية واحفظها بأمان"
+      },
+      "pharmacies": {
+        "title": "الصيدليات الشريكة",
+        "description": "التحقق من الأدوية وتوزيعها"
+      }
+    },
+    "stats": {
+      "doctors": "الأطباء الشركاء",
+      "specialties": "التخصصات الطبية",
+      "patients": "المرضى الراضون",
+      "support": "الدعم متاح"
+    },
+    "cta": {
+      "title": "مستعد للبدء؟",
+      "subtitle": "انضم إلى آلاف الجزائريين الذين يثقون في داويني لصحتهم",
+      "createAccount": "إنشاء حساب"
+    },
+    "trust": {
+      "title": "لماذا تختار داويني؟",
+      "security": {
+        "title": "آمن وسري",
+        "description": "بياناتك الطبية محمية بتشفير على مستوى البنوك"
+      },
+      "availability": {
+        "title": "متاح 24/7",
+        "description": "خدمة العملاء متاحة على مدار الساعة"
+      },
+      "verified": {
+        "title": "مختصون معتمدون",
+        "description": "جميع الأطباء والصيادلة معتمدون ومراجعون"
+      }
+    }
+  },
+  "actions": {
+    "search": "بحث",
+    "login": "تسجيل الدخول",
+    "register": "تسجيل",
+    "logout": "تسجيل الخروج",
+    "save": "حفظ",
+    "cancel": "إلغاء",
+    "edit": "تعديل",
+    "delete": "حذف",
+    "view": "عرض",
+    "book": "احجز",
+    "send": "إرسال"
+  },
+  "auth": {
+    "login": {
+      "title": "تسجيل الدخول",
+      "subtitle": "مرحباً بك مرة أخرى",
+      "email": "البريد الإلكتروني",
+      "password": "كلمة المرور",
+      "forgotPassword": "نسيت كلمة المرور؟",
+      "noAccount": "ليس لديك حساب؟",
+      "signUp": "سجل الآن"
+    },
+    "register": {
+      "title": "إنشاء حساب",
+      "subtitle": "انضم إلى داويني اليوم",
+      "fullName": "الاسم الكامل",
+      "email": "البريد الإلكتروني",
+      "password": "كلمة المرور",
+      "confirmPassword": "تأكيد كلمة المرور",
+      "phone": "رقم الهاتف",
+      "userType": "نوع المستخدم",
+      "patient": "مريض",
+      "doctor": "طبيب",
+      "pharmacist": "صيدلي",
+      "hasAccount": "لديك حساب بالفعل؟",
+      "signIn": "سجل الدخول"
+    }
+  },
+  "dashboard": {
+    "patient": {
+      "title": "لوحة تحكم المريض",
+      "welcome": "مرحباً",
+      "appointments": "المواعيد",
+      "doctors": "الأطباء",
+      "prescriptions": "الوصفات",
+      "messages": "الرسائل",
+      "profile": "الملف الشخصي"
+    },
+    "doctor": {
+      "title": "لوحة تحكم الطبيب",
+      "welcome": "مرحباً",
+      "appointments": "المواعيد",
+      "patients": "المرضى",
+      "prescriptions": "الوصفات",
+      "messages": "الرسائل",
+      "profile": "الملف الشخصي"
+    },
+    "pharmacy": {
+      "title": "لوحة تحكم الصيدلية",
+      "welcome": "مرحباً",
+      "prescriptions": "الوصفات",
+      "patients": "المرضى",
+      "messages": "الرسائل",
+      "profile": "الملف الشخصي"
+    }
+  },
+  "appointments": {
+    "title": "المواعيد",
+    "upcoming": "القادمة",
+    "past": "السابقة",
+    "bookNew": "احجز موعد جديد",
+    "noAppointments": "لا توجد مواعيد",
+    "status": {
+      "pending": "في الانتظار",
+      "confirmed": "مؤكد",
+      "completed": "مكتمل",
+      "cancelled": "ملغي"
+    }
+  },
+  "messages": {
+    "title": "الرسائل",
+    "conversations": "المحادثات",
+    "newMessage": "رسالة جديدة",
+    "typeMessage": "اكتب رسالتك...",
+    "send": "إرسال",
+    "noMessages": "لا توجد رسائل"
+  },
+  "profile": {
+    "title": "الملف الشخصي",
+    "personalInfo": "المعلومات الشخصية",
+    "medicalInfo": "المعلومات الطبية",
+    "allergies": "الحساسية",
+    "chronicConditions": "الأمراض المزمنة",
+    "bloodType": "فصيلة الدم",
+    "emergencyContact": "جهة الاتصال في حالات الطوارئ"
+  },
+  "common": {
+    "loading": "جاري التحميل...",
+    "error": "حدث خطأ",
+    "success": "تم بنجاح",
+    "confirm": "تأكيد",
+    "back": "رجوع",
+    "next": "التالي",
+    "previous": "السابق",
+    "close": "إغلاق",
+    "open": "فتح",
+    "edit": "تعديل",
+    "delete": "حذف",
+    "save": "حفظ",
+    "cancel": "إلغاء"
+  }
+}

@@ -1,9 +1,8 @@
 import express from 'express';
-import { Router } from 'express';
 import { query, validationResult } from 'express-validator';
 import { authenticateToken } from '../middleware/auth.js';
 
-const router = Router();
+const router = express.Router();
 
 // GET /api/geo/search - Search locations
 router.get('/search', [

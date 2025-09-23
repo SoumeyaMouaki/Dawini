@@ -44,7 +44,17 @@ const userSchema = new mongoose.Schema({
       required: true
     },
     street: String,
-    postalCode: String
+    postalCode: String,
+    coordinates: {
+      lat: { type: Number },
+      lng: { type: Number }
+    }
+  },
+  
+  // Profile picture
+  profilePicture: {
+    type: String,
+    default: null
   },
   
   // Profile status

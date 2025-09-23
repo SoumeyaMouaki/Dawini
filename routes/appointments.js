@@ -1,6 +1,6 @@
 import express from 'express';
 import { body, validationResult, query } from 'express-validator';
-import { authenticateToken, requirePatient, requireDoctor } from '../middleware/auth.js';
+import { authenticateToken } from '../middleware/auth.js';
 import Appointment from '../models/Appointment.js';
 import Doctor from '../models/Doctor.js';
 import Patient from '../models/Patient.js';
@@ -12,7 +12,7 @@ router.use(authenticateToken);
 
 // POST /api/appointments - Book a new appointment
 router.post('/', [
-  body('patientId').isMongoId().withMessage('Valid patient ID is required'),
+  body('patientId').notEmpty().withMessage('Patient ID is required'),
   body('doctorId').isMongoId().withMessage('Valid doctor ID is required'),
   body('date').isISO8601().withMessage('Valid date is required'),
   body('time').matches(/^([01]?[0-9]|2[0-3]):[0-5][0-9]$/).withMessage('Valid time format is required (HH:MM)'),
@@ -40,11 +40,21 @@ router.post('/', [
       notes 
     } = req.body;
 
-    // Verify patient owns this appointment or is a doctor
-    if (req.userType === 'patient' && patientId !== req.userId.toString()) {
-      return res.status(403).json({ 
-        error: 'Access denied. You can only book appointments for yourself.' 
-      });
+    // Find the patient profile ID for the current user
+    let actualPatientId;
+    
+    if (req.userType === 'patient') {
+      // Always find the patient profile for the current user
+      const patientProfile = await Patient.findOne({ userId: req.userId });
+      if (!patientProfile) {
+        return res.status(404).json({ 
+          error: 'Patient profile not found. Please complete your profile first.' 
+        });
+      }
+      actualPatientId = patientProfile._id;
+    } else {
+      // For non-patients, use the provided patientId (should be a valid ObjectId)
+      actualPatientId = patientId;
     }
 
     // Check if doctor exists and is available
@@ -61,8 +71,8 @@ router.post('/', [
       });
     }
 
-    // Check if patient exists
-    const patient = await Patient.findOne({ userId: patientId });
+    // Check if patient exists (using actualPatientId)
+    const patient = await Patient.findById(actualPatientId);
     if (!patient) {
       return res.status(404).json({ 
         error: 'Patient not found' 
@@ -71,7 +81,7 @@ router.post('/', [
 
     // Check if doctor is available at the requested time
     const appointmentDate = new Date(date);
-    const dayOfWeek = appointmentDate.toLocaleDateString('en-US', { weekday: 'lowercase' });
+    const dayOfWeek = appointmentDate.toLocaleDateString('en-US', { weekday: 'long' }).toLowerCase();
     const daySchedule = doctor.workingHours[dayOfWeek];
     
     if (!daySchedule || !daySchedule.isWorking) {
@@ -102,7 +112,7 @@ router.post('/', [
 
     // Check if patient has conflicting appointments
     const conflictingAppointment = await Appointment.findOne({
-      patientId,
+      patientId: actualPatientId,
       date: appointmentDate,
       time,
       status: { $in: ['pending', 'confirmed'] }
@@ -116,7 +126,7 @@ router.post('/', [
 
     // Create appointment
     const appointment = new Appointment({
-      patientId,
+      patientId: actualPatientId,
       doctorId,
       date: appointmentDate,
       time,
@@ -166,9 +176,23 @@ router.get('/', [
     let query = {};
     
     if (req.userType === 'patient') {
-      query.patientId = req.userId;
+      // Find patient profile ID
+      const patientProfile = await Patient.findOne({ userId: req.userId });
+      if (!patientProfile) {
+        return res.status(404).json({ 
+          error: 'Patient profile not found' 
+        });
+      }
+      query.patientId = patientProfile._id;
     } else if (req.userType === 'doctor') {
-      query.doctorId = req.userId;
+      // Find doctor profile ID
+      const doctorProfile = await Doctor.findOne({ userId: req.userId });
+      if (!doctorProfile) {
+        return res.status(404).json({ 
+          error: 'Doctor profile not found' 
+        });
+      }
+      query.doctorId = doctorProfile._id;
     } else {
       return res.status(403).json({ 
         error: 'Access denied. Only patients and doctors can view appointments.' 
@@ -229,16 +253,22 @@ router.get('/:id', async (req, res) => {
     }
 
     // Check access rights
-    if (req.userType === 'patient' && appointment.patientId.toString() !== req.userId.toString()) {
-      return res.status(403).json({ 
-        error: 'Access denied. You can only view your own appointments.' 
-      });
+    if (req.userType === 'patient') {
+      const patientProfile = await Patient.findOne({ userId: req.userId });
+      if (!patientProfile || appointment.patientId.toString() !== patientProfile._id.toString()) {
+        return res.status(403).json({ 
+          error: 'Access denied. You can only view your own appointments.' 
+        });
+      }
     }
 
-    if (req.userType === 'doctor' && appointment.doctorId.toString() !== req.userId.toString()) {
-      return res.status(403).json({ 
-        error: 'Access denied. You can only view appointments with you.' 
-      });
+    if (req.userType === 'doctor') {
+      const doctorProfile = await Doctor.findOne({ userId: req.userId });
+      if (!doctorProfile || appointment.doctorId.toString() !== doctorProfile._id.toString()) {
+        return res.status(403).json({ 
+          error: 'Access denied. You can only view appointments with you.' 
+        });
+      }
     }
 
     res.json({ appointment });
@@ -280,16 +310,22 @@ router.put('/:id', [
     }
 
     // Check access rights
-    if (req.userType === 'patient' && appointment.patientId.toString() !== req.userId.toString()) {
-      return res.status(403).json({ 
-        error: 'Access denied. You can only update your own appointments.' 
-      });
+    if (req.userType === 'patient') {
+      const patientProfile = await Patient.findOne({ userId: req.userId });
+      if (!patientProfile || appointment.patientId.toString() !== patientProfile._id.toString()) {
+        return res.status(403).json({ 
+          error: 'Access denied. You can only update your own appointments.' 
+        });
+      }
     }
 
-    if (req.userType === 'doctor' && appointment.doctorId.toString() !== req.userId.toString()) {
-      return res.status(403).json({ 
-        error: 'Access denied. You can only update appointments with you.' 
-      });
+    if (req.userType === 'doctor') {
+      const doctorProfile = await Doctor.findOne({ userId: req.userId });
+      if (!doctorProfile || appointment.doctorId.toString() !== doctorProfile._id.toString()) {
+        return res.status(403).json({ 
+          error: 'Access denied. You can only update appointments with you.' 
+        });
+      }
     }
 
     // Check if appointment can be modified
@@ -370,16 +406,22 @@ router.delete('/:id', async (req, res) => {
     }
 
     // Check access rights
-    if (req.userType === 'patient' && appointment.patientId.toString() !== req.userId.toString()) {
-      return res.status(403).json({ 
-        error: 'Access denied. You can only cancel your own appointments.' 
-      });
+    if (req.userType === 'patient') {
+      const patientProfile = await Patient.findOne({ userId: req.userId });
+      if (!patientProfile || appointment.patientId.toString() !== patientProfile._id.toString()) {
+        return res.status(403).json({ 
+          error: 'Access denied. You can only cancel your own appointments.' 
+        });
+      }
     }
 
-    if (req.userType === 'doctor' && appointment.doctorId.toString() !== req.userId.toString()) {
-      return res.status(403).json({ 
-        error: 'Access denied. You can only cancel appointments with you.' 
-      });
+    if (req.userType === 'doctor') {
+      const doctorProfile = await Doctor.findOne({ userId: req.userId });
+      if (!doctorProfile || appointment.doctorId.toString() !== doctorProfile._id.toString()) {
+        return res.status(403).json({ 
+          error: 'Access denied. You can only cancel appointments with you.' 
+        });
+      }
     }
 
     // Check if appointment can be cancelled
@@ -444,7 +486,7 @@ router.get('/doctor/:doctorId/availability', [
     }
 
     const appointmentDate = new Date(date);
-    const dayOfWeek = appointmentDate.toLocaleDateString('en-US', { weekday: 'lowercase' });
+    const dayOfWeek = appointmentDate.toLocaleDateString('en-US', { weekday: 'long' }).toLowerCase();
     const daySchedule = doctor.workingHours[dayOfWeek];
 
     if (!daySchedule || !daySchedule.isWorking) {

@@ -18,7 +18,9 @@ const validateRegistration = [
   body('phone').trim().isLength({ min: 10 }).withMessage('Phone number must be at least 10 characters'),
   body('userType').isIn(['patient', 'doctor', 'pharmacist']).withMessage('Invalid user type'),
   body('address.wilaya').trim().notEmpty().withMessage('Wilaya is required'),
-  body('address.commune').trim().notEmpty().withMessage('Commune is required')
+  body('address.commune').trim().notEmpty().withMessage('Commune is required'),
+  body('address.coordinates.lat').optional().isFloat({ min: -90, max: 90 }),
+  body('address.coordinates.lng').optional().isFloat({ min: -180, max: 180 })
 ];
 
 const validateLogin = [
@@ -84,6 +86,18 @@ router.post('/register', validateRegistration, async (req, res) => {
 
       case 'doctor':
         const { nOrdre, specialization, ...doctorData } = additionalData;
+        
+        // Check if nOrdre already exists
+        const existingDoctor = await Doctor.findOne({ nOrdre });
+        if (existingDoctor) {
+          // Delete the created user if doctor creation fails
+          await User.findByIdAndDelete(user._id);
+          return res.status(400).json({ 
+            error: 'Doctor with this registration number already exists',
+            field: 'nOrdre'
+          });
+        }
+        
         profile = new Doctor({
           userId: user._id,
           nOrdre,
@@ -128,13 +142,38 @@ router.post('/register', validateRegistration, async (req, res) => {
     // Handle duplicate key errors
     if (error.code === 11000) {
       const field = Object.keys(error.keyValue)[0];
+      let message = `${field} already exists`;
+      
+      // Clean up created user if profile creation fails
+      if (error.keyValue.userId) {
+        await User.findByIdAndDelete(error.keyValue.userId);
+      }
+      
+      // Provide specific error messages
+      if (field === 'email') {
+        message = 'Email address already exists';
+      } else if (field === 'nOrdre') {
+        message = 'Doctor registration number already exists';
+      } else if (field === 'nss') {
+        message = 'Patient social security number already exists';
+      } else if (field === 'licenseNumber') {
+        message = 'Pharmacy license number already exists';
+      }
+      
       return res.status(400).json({ 
-        error: `${field} already exists` 
+        error: message,
+        field: field
       });
     }
 
+    // Clean up created user if any other error occurs
+    if (user && user._id) {
+      await User.findByIdAndDelete(user._id);
+    }
+
     res.status(500).json({ 
-      error: 'Internal server error during registration' 
+      error: 'Internal server error during registration',
+      message: process.env.NODE_ENV === 'development' ? error.message : 'Please try again later'
     });
   }
 });
@@ -169,7 +208,14 @@ router.post('/login', validateLogin, async (req, res) => {
     }
 
     // Verify password
+    console.log('Login attempt for:', email);
+    console.log('User found:', !!user);
+    console.log('User password hash:', user.password);
+    console.log('Provided password:', password);
+    
     const isPasswordValid = await user.comparePassword(password);
+    console.log('Password valid:', isPasswordValid);
+    
     if (!isPasswordValid) {
       return res.status(401).json({ 
         error: 'Invalid email or password' 

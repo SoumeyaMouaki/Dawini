@@ -130,8 +130,7 @@ const prescriptionSchema = new mongoose.Schema({
   timestamps: true
 });
 
-// Indexes for efficient queries
-prescriptionSchema.index({ prescriptionCode: 1 });
+// Indexes for efficient queries (prescriptionCode already has unique index from schema)
 prescriptionSchema.index({ patientId: 1, issueDate: -1 });
 prescriptionSchema.index({ doctorId: 1, issueDate: -1 });
 prescriptionSchema.index({ status: 1, expiryDate: 1 });

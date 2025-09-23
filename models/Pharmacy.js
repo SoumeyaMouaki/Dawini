@@ -147,9 +147,7 @@ const pharmacySchema = new mongoose.Schema({
   timestamps: true
 });
 
-// Indexes for efficient queries
-pharmacySchema.index({ licenseNumber: 1 });
-pharmacySchema.index({ userId: 1 });
+// Indexes for efficient queries (licenseNumber and userId already have unique indexes from schema)
 pharmacySchema.index({ 'location.wilaya': 1, 'location.commune': 1 });
 pharmacySchema.index({ isAvailable: 1, isVerified: 1 });
 pharmacySchema.index({ 'location.coordinates': '2dsphere' });

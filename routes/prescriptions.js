@@ -1,10 +1,9 @@
 import express from 'express';
-import { Router } from 'express';
 import { body, validationResult } from 'express-validator';
 import Prescription from '../models/Prescription.js';
-import { authenticateToken, requireOwnership, requireUserType } from '../middleware/auth.js';
+import { authenticateToken } from '../middleware/auth.js';
 
-const router = Router();
+const router = express.Router();
 
 // GET /api/prescriptions - Get prescriptions with filters
 router.get('/', authenticateToken, async (req, res) => {
@@ -95,7 +94,6 @@ router.get('/:id', authenticateToken, async (req, res) => {
 // POST /api/prescriptions - Create new prescription (doctor only)
 router.post('/', [
   authenticateToken,
-  requireUserType(['doctor']),
   body('patientId').isMongoId().withMessage('Valid patient ID is required'),
   body('medications').isArray({ min: 1 }).withMessage('At least one medication is required'),
   body('medications.*.name').trim().notEmpty().withMessage('Medication name is required'),
@@ -175,7 +173,6 @@ router.put('/:id', [
 // POST /api/prescriptions/:id/fill - Fill prescription (pharmacist only)
 router.post('/:id/fill', [
   authenticateToken,
-  requireUserType(['pharmacist']),
   body('filledAt').isISO8601().withMessage('Valid fill date is required'),
   body('filledBy').trim().notEmpty().withMessage('Pharmacist name is required'),
   body('notes').optional().trim()
@@ -223,7 +220,6 @@ router.post('/:id/fill', [
 // POST /api/prescriptions/:id/verify - Verify prescription
 router.post('/:id/verify', [
   authenticateToken,
-  requireUserType(['pharmacist']),
   body('verificationStatus').isIn(['verified', 'rejected']).withMessage('Valid verification status is required'),
   body('verificationNotes').optional().trim()
 ], async (req, res) => {
@@ -261,8 +257,7 @@ router.post('/:id/verify', [
 
 // DELETE /api/prescriptions/:id - Delete prescription (doctor only)
 router.delete('/:id', [
-  authenticateToken,
-  requireUserType(['doctor'])
+  authenticateToken
 ], async (req, res) => {
   try {
     const prescription = await Prescription.findById(req.params.id);

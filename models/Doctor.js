@@ -147,11 +147,10 @@ const doctorSchema = new mongoose.Schema({
   timestamps: true
 });
 
-// Indexes for efficient queries
-doctorSchema.index({ nOrdre: 1 });
-doctorSchema.index({ userId: 1 });
+// Indexes for efficient queries (nOrdre and userId already have unique indexes from schema)
 doctorSchema.index({ specialization: 1 });
 doctorSchema.index({ 'address.wilaya': 1, 'address.commune': 1 });
+doctorSchema.index({ 'userId': 1, specialization: 1, isAvailable: 1 });
 doctorSchema.index({ isAvailable: 1, isVerified: 1 });
 
 // Virtual for full working hours

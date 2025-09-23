@@ -1,361 +1,449 @@
 import express from 'express';
-import { Router } from 'express';
-import { body, validationResult } from 'express-validator';
-import { authenticateToken, requireOwnership } from '../middleware/auth.js';
+import { body, validationResult, query } from 'express-validator';
+import { authenticateToken } from '../middleware/auth.js';
+import Conversation from '../models/Conversation.js';
+import Message from '../models/Message.js';
+import User from '../models/User.js';
+import Patient from '../models/Patient.js';
+import Doctor from '../models/Doctor.js';
+import Pharmacy from '../models/Pharmacy.js';
 
-const router = Router();
+const router = express.Router();
 
-// Mock Message model - In a real application, this would be a proper Mongoose model
-class Message {
-  constructor(data) {
-    this.id = data.id || Math.random().toString(36).substr(2, 9);
-    this.senderId = data.senderId;
-    this.receiverId = data.receiverId;
-    this.content = data.content;
-    this.type = data.type || 'text';
-    this.status = data.status || 'sent';
-    this.createdAt = data.createdAt || new Date();
-    this.readAt = data.readAt;
-    this.attachments = data.attachments || [];
-  }
+// Apply authentication middleware to all routes
+router.use(authenticateToken);
 
-  static find(filter = {}) {
-    // Mock find method
-    return Promise.resolve(mockMessages.filter(msg => {
-      for (let key in filter) {
-        if (msg[key] !== filter[key]) return false;
-      }
-      return true;
-    }));
-  }
-
-  static findById(id) {
-    // Mock findById method
-    const message = mockMessages.find(msg => msg.id === id);
-    return Promise.resolve(message || null);
-  }
-
-  static create(data) {
-    // Mock create method
-    const message = new Message(data);
-    mockMessages.push(message);
-    return Promise.resolve(message);
-  }
-
-  static findByIdAndUpdate(id, update, options = {}) {
-    // Mock findByIdAndUpdate method
-    const index = mockMessages.findIndex(msg => msg.id === id);
-    if (index === -1) return Promise.resolve(null);
-    
-    mockMessages[index] = { ...mockMessages[index], ...update };
-    if (options.new) {
-      return Promise.resolve(mockMessages[index]);
-    }
-    return Promise.resolve(mockMessages[index]);
-  }
-
-  static countDocuments(filter = {}) {
-    // Mock countDocuments method
-    return Promise.resolve(mockMessages.filter(msg => {
-      for (let key in filter) {
-        if (msg[key] !== filter[key]) return false;
-      }
-      return true;
-    }).length);
-  }
-}
-
-// Mock messages data
-let mockMessages = [
-  {
-    id: '1',
-    senderId: 'user1',
-    receiverId: 'user2',
-    content: 'Bonjour, j\'ai besoin d\'un rendez-vous',
-    type: 'text',
-    status: 'read',
-    createdAt: new Date('2024-01-15T10:00:00Z'),
-    readAt: new Date('2024-01-15T10:05:00Z'),
-    attachments: []
-  },
-  {
-    id: '2',
-    senderId: 'user2',
-    receiverId: 'user1',
-    content: 'Bonjour, je peux vous recevoir demain à 14h',
-    type: 'text',
-    status: 'sent',
-    createdAt: new Date('2024-01-15T10:10:00Z'),
-    readAt: null,
-    attachments: []
-  }
-];
-
-// GET /api/messages - Get messages with filters
-router.get('/', authenticateToken, async (req, res) => {
+// GET /api/messages/conversations - Get all conversations for current user
+router.get('/conversations', async (req, res) => {
   try {
-    const { 
-      conversationId, 
-      status, 
-      type, 
-      page = 1, 
-      limit = 20 
-    } = req.query;
+    const userId = req.userId;
+    const userType = req.userType;
 
-    const filter = {};
-    
-    if (conversationId) {
-      filter.conversationId = conversationId;
-    }
-    
-    if (status) {
-      filter.status = status;
-    }
-    
-    if (type) {
-      filter.type = type;
+    // Find the current user's profile ID
+    let currentUserProfileId;
+    if (userType === 'patient') {
+      const patientProfile = await Patient.findOne({ userId });
+      currentUserProfileId = patientProfile?._id;
+    } else if (userType === 'doctor') {
+      const doctorProfile = await Doctor.findOne({ userId });
+      currentUserProfileId = doctorProfile?._id;
+    } else if (userType === 'pharmacist') {
+      const pharmacyProfile = await Pharmacy.findOne({ userId });
+      currentUserProfileId = pharmacyProfile?._id;
     }
 
-    // Filter messages where user is sender or receiver
-    const messages = await Message.find(filter);
-    const userMessages = messages.filter(msg => 
-      msg.senderId === req.user.id || msg.receiverId === req.user.id
-    );
+    if (!currentUserProfileId) {
+      return res.status(404).json({
+        success: false,
+        error: 'User profile not found'
+      });
+    }
 
-    // Apply pagination
-    const startIndex = (page - 1) * limit;
-    const endIndex = startIndex + parseInt(limit);
-    const paginatedMessages = userMessages.slice(startIndex, endIndex);
+    // Build query based on user type and profile ID
+    let query = {};
+    if (userType === 'patient') {
+      query.patient = currentUserProfileId;
+    } else if (userType === 'doctor') {
+      query.doctor = currentUserProfileId;
+    } else if (userType === 'pharmacist') {
+      query.pharmacist = currentUserProfileId;
+    }
 
-    const total = userMessages.length;
+    const conversations = await Conversation.find(query)
+      .populate('patient', 'userId')
+      .populate('doctor', 'userId')
+      .populate('pharmacist', 'userId')
+      .populate('lastMessage')
+      .populate({
+        path: 'patient.userId',
+        select: 'fullName email profilePicture'
+      })
+      .populate({
+        path: 'doctor.userId',
+        select: 'fullName email profilePicture specialization'
+      })
+      .populate({
+        path: 'pharmacist.userId',
+        select: 'fullName email profilePicture'
+      })
+      .sort({ updatedAt: -1 });
 
     res.json({
-      messages: paginatedMessages,
-      totalPages: Math.ceil(total / limit),
-      currentPage: parseInt(page),
-      total
+      success: true,
+      conversations: conversations
     });
+
   } catch (error) {
-    res.status(500).json({ message: 'Server error', error: error.message });
+    console.error('Error fetching conversations:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to fetch conversations'
+    });
   }
 });
 
-// GET /api/messages/conversations - Get user conversations
-router.get('/conversations', authenticateToken, async (req, res) => {
+// POST /api/messages/conversations - Create new conversation
+router.post('/conversations', [
+  body('participantId').isMongoId().withMessage('Valid participant ID is required'),
+  body('participantType').isIn(['patient', 'doctor', 'pharmacist']).withMessage('Valid participant type is required')
+], async (req, res) => {
   try {
-    const messages = await Message.find();
-    const userMessages = messages.filter(msg => 
-      msg.senderId === req.user.id || msg.receiverId === req.user.id
-    );
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({
+        success: false,
+        error: 'Validation failed',
+        details: errors.array()
+      });
+    }
 
-    // Group messages by conversation
-    const conversations = {};
-    userMessages.forEach(msg => {
-      const otherUserId = msg.senderId === req.user.id ? msg.receiverId : msg.senderId;
-      if (!conversations[otherUserId]) {
-        conversations[otherUserId] = {
-          userId: otherUserId,
-          lastMessage: msg,
-          unreadCount: 0
-        };
+    const { participantId, participantType } = req.body;
+    const currentUserId = req.userId;
+    const currentUserType = req.userType;
+
+    // Find the profile IDs for both current user and participant
+    let currentUserProfileId, participantProfileId;
+
+    // Get current user's profile ID
+    if (currentUserType === 'patient') {
+      const patientProfile = await Patient.findOne({ userId: currentUserId });
+      currentUserProfileId = patientProfile?._id;
+    } else if (currentUserType === 'doctor') {
+      const doctorProfile = await Doctor.findOne({ userId: currentUserId });
+      currentUserProfileId = doctorProfile?._id;
+    } else if (currentUserType === 'pharmacist') {
+      const pharmacyProfile = await Pharmacy.findOne({ userId: currentUserId });
+      currentUserProfileId = pharmacyProfile?._id;
+    }
+
+    // Get participant's profile ID
+    if (participantType === 'patient') {
+      const patientProfile = await Patient.findOne({ userId: participantId });
+      participantProfileId = patientProfile?._id;
+    } else if (participantType === 'doctor') {
+      const doctorProfile = await Doctor.findOne({ userId: participantId });
+      participantProfileId = doctorProfile?._id;
+    } else if (participantType === 'pharmacist') {
+      const pharmacyProfile = await Pharmacy.findOne({ userId: participantId });
+      participantProfileId = pharmacyProfile?._id;
+    }
+
+    if (!currentUserProfileId || !participantProfileId) {
+      return res.status(404).json({
+        success: false,
+        error: 'User profile not found',
+        details: { currentUserProfileId, participantProfileId }
+      });
+    }
+
+    // Check if conversation already exists
+    let existingConversation;
+    if (currentUserType === 'patient') {
+      if (participantType === 'doctor') {
+        existingConversation = await Conversation.findOne({
+          patient: currentUserProfileId,
+          doctor: participantProfileId
+        });
+      } else if (participantType === 'pharmacist') {
+        existingConversation = await Conversation.findOne({
+          patient: currentUserProfileId,
+          pharmacist: participantProfileId
+        });
       }
-      
-      if (msg.receiverId === req.user.id && msg.status === 'sent') {
-        conversations[otherUserId].unreadCount++;
+    } else if (currentUserType === 'doctor') {
+      if (participantType === 'patient') {
+        existingConversation = await Conversation.findOne({
+          doctor: currentUserProfileId,
+          patient: participantProfileId
+        });
+      } else if (participantType === 'pharmacist') {
+        existingConversation = await Conversation.findOne({
+          doctor: currentUserProfileId,
+          pharmacist: participantProfileId
+        });
       }
-      
-      if (!conversations[otherUserId].lastMessage || 
-          msg.createdAt > conversations[otherUserId].lastMessage.createdAt) {
-        conversations[otherUserId].lastMessage = msg;
+    } else if (currentUserType === 'pharmacist') {
+      if (participantType === 'patient') {
+        existingConversation = await Conversation.findOne({
+          pharmacist: currentUserProfileId,
+          patient: participantProfileId
+        });
+      } else if (participantType === 'doctor') {
+        existingConversation = await Conversation.findOne({
+          pharmacist: currentUserProfileId,
+          doctor: participantProfileId
+        });
       }
+    }
+
+    if (existingConversation) {
+      return res.json({
+        success: true,
+        conversation: existingConversation
+      });
+    }
+
+    // Create new conversation
+    const conversationData = {};
+    if (currentUserType === 'patient') {
+      conversationData.patient = currentUserProfileId;
+      if (participantType === 'doctor') {
+        conversationData.doctor = participantProfileId;
+      } else if (participantType === 'pharmacist') {
+        conversationData.pharmacist = participantProfileId;
+      }
+    } else if (currentUserType === 'doctor') {
+      conversationData.doctor = currentUserProfileId;
+      if (participantType === 'patient') {
+        conversationData.patient = participantProfileId;
+      } else if (participantType === 'pharmacist') {
+        conversationData.pharmacist = participantProfileId;
+      }
+    } else if (currentUserType === 'pharmacist') {
+      conversationData.pharmacist = currentUserProfileId;
+      if (participantType === 'patient') {
+        conversationData.patient = participantProfileId;
+      } else if (participantType === 'doctor') {
+        conversationData.doctor = participantProfileId;
+      }
+    }
+
+    const conversation = new Conversation(conversationData);
+    await conversation.save();
+
+    // Populate the conversation
+    await conversation.populate([
+      { path: 'patient', select: 'userId' },
+      { path: 'doctor', select: 'userId' },
+      { path: 'pharmacist', select: 'userId' },
+      { path: 'patient.userId', select: 'fullName email profilePicture' },
+      { path: 'doctor.userId', select: 'fullName email profilePicture specialization' },
+      { path: 'pharmacist.userId', select: 'fullName email profilePicture' }
+    ]);
+
+    res.status(201).json({
+      success: true,
+      conversation: conversation
     });
 
-    const conversationList = Object.values(conversations)
-      .sort((a, b) => b.lastMessage.createdAt - a.lastMessage.createdAt);
-
-    res.json({
-      conversations: conversationList,
-      total: conversationList.length
-    });
   } catch (error) {
-    res.status(500).json({ message: 'Server error', error: error.message });
+    console.error('Error creating conversation:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to create conversation'
+    });
   }
 });
 
-// GET /api/messages/:id - Get message by ID
-router.get('/:id', authenticateToken, async (req, res) => {
+// GET /api/messages/:conversationId - Get messages for a conversation
+router.get('/:conversationId', async (req, res) => {
   try {
-    const message = await Message.findById(req.params.id);
-    
+    const { conversationId } = req.params;
+    const { page = 1, limit = 50 } = req.query;
+
+    // Verify user has access to this conversation
+    const conversation = await Conversation.findById(conversationId);
+    if (!conversation) {
+      return res.status(404).json({
+        success: false,
+        error: 'Conversation not found'
+      });
+    }
+
+    // Check if user is participant
+    const userId = req.userId;
+    const userType = req.userType;
+
+    // Find the current user's profile ID
+    let currentUserProfileId;
+    if (userType === 'patient') {
+      const patientProfile = await Patient.findOne({ userId });
+      currentUserProfileId = patientProfile?._id;
+    } else if (userType === 'doctor') {
+      const doctorProfile = await Doctor.findOne({ userId });
+      currentUserProfileId = doctorProfile?._id;
+    } else if (userType === 'pharmacist') {
+      const pharmacyProfile = await Pharmacy.findOne({ userId });
+      currentUserProfileId = pharmacyProfile?._id;
+    }
+
+    if (!currentUserProfileId) {
+      return res.status(404).json({
+        success: false,
+        error: 'User profile not found'
+      });
+    }
+
+    // Check if user is participant by comparing profile IDs
+    const isParticipant = 
+      (conversation.patient && conversation.patient.toString() === currentUserProfileId.toString()) ||
+      (conversation.doctor && conversation.doctor.toString() === currentUserProfileId.toString()) ||
+      (conversation.pharmacist && conversation.pharmacist.toString() === currentUserProfileId.toString());
+
+    if (!isParticipant) {
+      return res.status(403).json({
+        success: false,
+        error: 'Access denied'
+      });
+    }
+
+    // Get messages
+    const skip = (page - 1) * limit;
+    const messages = await Message.find({ conversationId })
+      .populate('senderId', 'fullName email profilePicture')
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(parseInt(limit));
+
+    res.json({
+      success: true,
+      messages: messages.reverse() // Return in chronological order
+    });
+
+  } catch (error) {
+    console.error('Error fetching messages:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to fetch messages'
+    });
+  }
+});
+
+// POST /api/messages - Send a new message
+router.post('/', [
+  body('conversationId').isMongoId().withMessage('Valid conversation ID is required'),
+  body('content').trim().isLength({ min: 1, max: 2000 }).withMessage('Message content is required (1-2000 characters)'),
+  body('type').optional().isIn(['text', 'image', 'file', 'prescription'])
+], async (req, res) => {
+  try {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({
+        success: false,
+        error: 'Validation failed',
+        details: errors.array()
+      });
+    }
+
+    const { conversationId, content, type = 'text' } = req.body;
+    const userId = req.userId;
+    const userType = req.userType;
+
+    // Verify conversation exists and user has access
+    const conversation = await Conversation.findById(conversationId);
+    if (!conversation) {
+      return res.status(404).json({
+        success: false,
+        error: 'Conversation not found'
+      });
+    }
+
+    // Check if user is participant
+    // Find the current user's profile ID
+    let currentUserProfileId;
+    if (userType === 'patient') {
+      const patientProfile = await Patient.findOne({ userId });
+      currentUserProfileId = patientProfile?._id;
+    } else if (userType === 'doctor') {
+      const doctorProfile = await Doctor.findOne({ userId });
+      currentUserProfileId = doctorProfile?._id;
+    } else if (userType === 'pharmacist') {
+      const pharmacyProfile = await Pharmacy.findOne({ userId });
+      currentUserProfileId = pharmacyProfile?._id;
+    }
+
+    if (!currentUserProfileId) {
+      return res.status(404).json({
+        success: false,
+        error: 'User profile not found'
+      });
+    }
+
+    // Check if user is participant by comparing profile IDs
+    const isParticipant = 
+      (conversation.patient && conversation.patient.toString() === currentUserProfileId.toString()) ||
+      (conversation.doctor && conversation.doctor.toString() === currentUserProfileId.toString()) ||
+      (conversation.pharmacist && conversation.pharmacist.toString() === currentUserProfileId.toString());
+
+    if (!isParticipant) {
+      return res.status(403).json({
+        success: false,
+        error: 'Access denied'
+      });
+    }
+
+    // Create message
+    const message = new Message({
+      conversationId,
+      senderId: userId,
+      senderType: userType,
+      content,
+      type
+    });
+
+    await message.save();
+
+    // Update conversation's last message and timestamp
+    conversation.lastMessage = message._id;
+    conversation.updatedAt = new Date();
+    await conversation.save();
+
+    // Populate sender info
+    await message.populate('senderId', 'fullName email profilePicture');
+
+    res.status(201).json({
+      success: true,
+      message: message
+    });
+
+  } catch (error) {
+    console.error('Error sending message:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to send message'
+    });
+  }
+});
+
+// PUT /api/messages/:messageId/read - Mark message as read
+router.put('/:messageId/read', async (req, res) => {
+  try {
+    const { messageId } = req.params;
+    const userId = req.userId;
+
+    const message = await Message.findById(messageId);
     if (!message) {
-      return res.status(404).json({ message: 'Message not found' });
+      return res.status(404).json({
+        success: false,
+        error: 'Message not found'
+      });
     }
 
-    // Check if user is sender or receiver
-    if (message.senderId !== req.user.id && message.receiverId !== req.user.id) {
-      return res.status(403).json({ message: 'Access denied' });
-    }
+    // Check if user is already in readBy array
+    const alreadyRead = message.readBy.some(read => 
+      read.userId.toString() === userId
+    );
 
-    // Mark as read if user is receiver
-    if (message.receiverId === req.user.id && message.status === 'sent') {
-      await Message.findByIdAndUpdate(req.params.id, {
-        status: 'read',
+    if (!alreadyRead) {
+      message.readBy.push({
+        userId: userId,
         readAt: new Date()
       });
       message.status = 'read';
-      message.readAt = new Date();
+      await message.save();
     }
-
-    res.json(message);
-  } catch (error) {
-    res.status(500).json({ message: 'Server error', error: error.message });
-  }
-});
-
-// POST /api/messages - Send new message
-router.post('/', [
-  authenticateToken,
-  body('receiverId').trim().notEmpty().withMessage('Receiver ID is required'),
-  body('content').trim().notEmpty().withMessage('Message content is required'),
-  body('type').optional().isIn(['text', 'image', 'file', 'audio']).withMessage('Invalid message type'),
-  body('attachments').optional().isArray().withMessage('Attachments must be an array')
-], async (req, res) => {
-  try {
-    const errors = validationResult(req);
-    if (!errors.isEmpty()) {
-      return res.status(400).json({ errors: errors.array() });
-    }
-
-    const { receiverId, content, type = 'text', attachments = [] } = req.body;
-
-    // Check if receiver exists (in a real app, validate against User model)
-    if (receiverId === req.user.id) {
-      return res.status(400).json({ message: 'Cannot send message to yourself' });
-    }
-
-    const messageData = {
-      senderId: req.user.id,
-      receiverId,
-      content,
-      type,
-      attachments,
-      status: 'sent',
-      createdAt: new Date()
-    };
-
-    const message = await Message.create(messageData);
-
-    res.status(201).json(message);
-  } catch (error) {
-    res.status(500).json({ message: 'Server error', error: error.message });
-  }
-});
-
-// PUT /api/messages/:id - Update message
-router.put('/:id', [
-  authenticateToken,
-  body('content').optional().trim().notEmpty().withMessage('Message content cannot be empty'),
-  body('status').optional().isIn(['sent', 'read', 'delivered']).withMessage('Invalid status')
-], async (req, res) => {
-  try {
-    const errors = validationResult(req);
-    if (!errors.isEmpty()) {
-      return res.status(400).json({ errors: errors.array() });
-    }
-
-    const message = await Message.findById(req.params.id);
-    if (!message) {
-      return res.status(404).json({ message: 'Message not found' });
-    }
-
-    // Only sender can update message
-    if (message.senderId !== req.user.id) {
-      return res.status(403).json({ message: 'Access denied' });
-    }
-
-    // Only allow updating content and status
-    const updateData = {};
-    if (req.body.content) updateData.content = req.body.content;
-    if (req.body.status) updateData.status = req.body.status;
-
-    const updatedMessage = await Message.findByIdAndUpdate(
-      req.params.id,
-      updateData,
-      { new: true }
-    );
-
-    res.json(updatedMessage);
-  } catch (error) {
-    res.status(500).json({ message: 'Server error', error: error.message });
-  }
-});
-
-// DELETE /api/messages/:id - Delete message
-router.delete('/:id', authenticateToken, async (req, res) => {
-  try {
-    const message = await Message.findById(req.params.id);
-    if (!message) {
-      return res.status(404).json({ message: 'Message not found' });
-    }
-
-    // Only sender can delete message
-    if (message.senderId !== req.user.id) {
-      return res.status(403).json({ message: 'Access denied' });
-    }
-
-    // Remove from mock data
-    const index = mockMessages.findIndex(msg => msg.id === req.params.id);
-    if (index !== -1) {
-      mockMessages.splice(index, 1);
-    }
-
-    res.json({ message: 'Message deleted successfully' });
-  } catch (error) {
-    res.status(500).json({ message: 'Server error', error: error.message });
-  }
-});
-
-// POST /api/messages/:id/read - Mark message as read
-router.post('/:id/read', authenticateToken, async (req, res) => {
-  try {
-    const message = await Message.findById(req.params.id);
-    if (!message) {
-      return res.status(404).json({ message: 'Message not found' });
-    }
-
-    // Only receiver can mark as read
-    if (message.receiverId !== req.user.id) {
-      return res.status(403).json({ message: 'Access denied' });
-    }
-
-    const updatedMessage = await Message.findByIdAndUpdate(
-      req.params.id,
-      {
-        status: 'read',
-        readAt: new Date()
-      },
-      { new: true }
-    );
-
-    res.json(updatedMessage);
-  } catch (error) {
-    res.status(500).json({ message: 'Server error', error: error.message });
-  }
-});
-
-// GET /api/messages/unread/count - Get unread message count
-router.get('/unread/count', authenticateToken, async (req, res) => {
-  try {
-    const messages = await Message.find();
-    const unreadMessages = messages.filter(msg => 
-      msg.receiverId === req.user.id && msg.status === 'sent'
-    );
 
     res.json({
-      unreadCount: unreadMessages.length
+      success: true,
+      message: 'Message marked as read'
     });
+
   } catch (error) {
-    res.status(500).json({ message: 'Server error', error: error.message });
+    console.error('Error marking message as read:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to mark message as read'
+    });
   }
 });
 

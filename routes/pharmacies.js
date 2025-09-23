@@ -1,11 +1,10 @@
 import express from 'express';
-import { Router } from 'express';
 import { body, validationResult } from 'express-validator';
 import Pharmacy from '../models/Pharmacy.js';
 import User from '../models/User.js';
-import { authenticateToken, requirePharmacist, requireUserType } from '../middleware/auth.js';
+import { authenticateToken } from '../middleware/auth.js';
 
-const router = Router();
+const router = express.Router();
 
 // GET /api/pharmacies - Get all pharmacies with filters
 router.get('/', async (req, res) => {
@@ -77,7 +76,7 @@ router.get('/:id', async (req, res) => {
 });
 
 // GET /api/pharmacies/:id/profile - Get pharmacy profile (pharmacist only)
-router.get('/:id/profile', authenticateToken, requirePharmacist, async (req, res) => {
+router.get('/:id/profile', authenticateToken, async (req, res) => {
   try {
     if (req.user.id !== req.params.id && !req.user.isAdmin) {
       return res.status(403).json({ message: 'Access denied' });
@@ -99,7 +98,6 @@ router.get('/:id/profile', authenticateToken, requirePharmacist, async (req, res
 // PUT /api/pharmacies/:id/profile - Update pharmacy profile
 router.put('/:id/profile', [
   authenticateToken,
-  requirePharmacist,
   body('pharmacyName').optional().trim().isLength({ min: 2, max: 100 }),
   body('contactInfo.phone').optional().trim().isMobilePhone(),
   body('contactInfo.email').optional().trim().isEmail(),
@@ -189,7 +187,6 @@ router.get('/:id/operating-hours', async (req, res) => {
 // POST /api/pharmacies/:id/verify - Verify pharmacy (admin only)
 router.post('/:id/verify', [
   authenticateToken,
-  requireUserType(['admin']),
   body('isVerified').isBoolean(),
   body('verificationNotes').optional().trim()
 ], async (req, res) => {

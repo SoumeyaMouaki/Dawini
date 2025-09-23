@@ -1,6 +1,6 @@
 import express from 'express';
 import { body, validationResult, query } from 'express-validator';
-import { authenticateToken, requirePatient } from '../middleware/auth.js';
+import { authenticateToken } from '../middleware/auth.js';
 import Patient from '../models/Patient.js';
 import Appointment from '../models/Appointment.js';
 import Prescription from '../models/Prescription.js';
@@ -10,7 +10,6 @@ const router = express.Router();
 
 // Apply authentication middleware to all routes
 router.use(authenticateToken);
-router.use(requirePatient);
 
 // GET /api/patients/:id/appointments
 router.get('/:id/appointments', async (req, res) => {
@@ -357,7 +356,7 @@ router.get('/:id/doctors/search', [
       });
     }
 
-    // Build query
+    // Build query with improved filtering
     const query = { isAvailable: true, isVerified: true };
     
     if (specialization) {
@@ -365,17 +364,17 @@ router.get('/:id/doctors/search', [
     }
     
     if (wilaya) {
-      query['address.wilaya'] = { $regex: wilaya, $options: 'i' };
+      query['userId.address.wilaya'] = { $regex: wilaya, $options: 'i' };
     }
     
     if (commune) {
-      query['address.commune'] = { $regex: commune, $options: 'i' };
+      query['userId.address.commune'] = { $regex: commune, $options: 'i' };
     }
 
     const skip = (page - 1) * limit;
     const doctors = await Doctor.find(query)
-      .populate('userId', 'fullName address phone')
-      .sort({ 'address.wilaya': 1, 'address.commune': 1 })
+      .populate('userId', 'fullName email phone address')
+      .sort({ 'userId.address.wilaya': 1, 'userId.address.commune': 1 })
       .skip(skip)
       .limit(parseInt(limit));
 
@@ -386,7 +385,7 @@ router.get('/:id/doctors/search', [
     if (date && time) {
       const searchDate = new Date(date);
       const searchTime = time;
-      const dayOfWeek = searchDate.toLocaleDateString('en-US', { weekday: 'lowercase' });
+      const dayOfWeek = searchDate.toLocaleDateString('en-US', { weekday: 'long' }).toLowerCase();
       
       availableDoctors = doctors.filter(doctor => {
         const daySchedule = doctor.workingHours[dayOfWeek];
@@ -396,20 +395,32 @@ router.get('/:id/doctors/search', [
       });
     }
 
+    // Enhanced response with better error handling
     res.json({
+      success: true,
       doctors: availableDoctors,
+      total: availableDoctors.length,
       pagination: {
         page: parseInt(page),
         limit: parseInt(limit),
         total,
         pages: Math.ceil(total / limit)
+      },
+      filters: {
+        specialization: specialization || null,
+        wilaya: wilaya || null,
+        commune: commune || null,
+        date: date || null,
+        time: time || null
       }
     });
 
   } catch (error) {
     console.error('Search doctors error:', error);
     res.status(500).json({ 
-      error: 'Internal server error while searching doctors' 
+      success: false,
+      error: 'Internal server error while searching doctors',
+      message: 'Unable to search doctors at this time. Please try again later.'
     });
   }
 });

@@ -65,9 +65,7 @@ const patientSchema = new mongoose.Schema({
   timestamps: true
 });
 
-// Index for efficient queries
-patientSchema.index({ nss: 1 });
-patientSchema.index({ userId: 1 });
+// Indexes for efficient queries (nss and userId already have unique indexes from schema)
 patientSchema.index({ 'address.wilaya': 1, 'address.commune': 1 });
 
 // Virtual for age calculation

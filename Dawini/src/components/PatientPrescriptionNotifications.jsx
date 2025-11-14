@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { 
   Bell, 
   CheckCircle, 
@@ -8,68 +8,22 @@ import {
   AlertCircle,
   Info
 } from 'lucide-react'
-import prescriptionService from '../services/PrescriptionService.js'
+import api from '../api/axios.js'
+import { useToast } from '../context/ToastContext.jsx'
 
 export default function PatientPrescriptionNotifications({ userId }) {
   const [notifications, setNotifications] = useState([])
   const [isOpen, setIsOpen] = useState(false)
   const [unreadCount, setUnreadCount] = useState(0)
-
-  useEffect(() => {
-    // Charger les notifications depuis le service
-    const loadNotifications = () => {
-      try {
-        // Simuler des notifications basées sur les ordonnances
-        const allPrescriptions = prescriptionService.getAllPrescriptions()
-        const patientPrescriptions = allPrescriptions.filter(p => 
-          p.patientId === userId || p.patientId?.userId?._id === userId
-        )
-
-        const patientNotifications = patientPrescriptions.map(prescription => ({
-          id: `notif_${prescription._id}`,
-          type: 'prescription_update',
-          title: 'Mise à jour de votre ordonnance',
-          message: getPrescriptionMessage(prescription),
-          timestamp: prescription.updatedAt || prescription.createdAt,
-          isRead: false,
-          prescriptionId: prescription._id,
-          status: prescription.status
-        }))
-
-        setNotifications(patientNotifications)
-        setUnreadCount(patientNotifications.filter(n => !n.isRead).length)
-      } catch (error) {
-        console.error('Error loading notifications:', error)
-      }
-    }
-
-    loadNotifications()
-
-    // Écouter les changements d'ordonnances
-    const unsubscribe = prescriptionService.addListener((updatedPrescriptions) => {
-      const patientPrescriptions = updatedPrescriptions.filter(p => 
-        p.patientId === userId || p.patientId?.userId?._id === userId
-      )
-
-      const newNotifications = patientPrescriptions.map(prescription => ({
-        id: `notif_${prescription._id}`,
-        type: 'prescription_update',
-        title: 'Mise à jour de votre ordonnance',
-        message: getPrescriptionMessage(prescription),
-        timestamp: prescription.updatedAt || prescription.createdAt,
-        isRead: false,
-        prescriptionId: prescription._id,
-        status: prescription.status
-      }))
-
-      setNotifications(newNotifications)
-      setUnreadCount(newNotifications.filter(n => !n.isRead).length)
-    })
-
-    return unsubscribe
-  }, [userId])
+  const previousStatusesRef = useRef({})
+  const { showInfo } = useToast()
 
   const getPrescriptionMessage = (prescription) => {
+    if (prescription.status === 'filled') {
+      const pharmacyName = prescription.pharmacyId?.pharmacyName || 'Votre pharmacie'
+      const notes = prescription.pharmacy?.notes || ''
+      return `✅ Votre ordonnance (${prescription.prescriptionCode}) est prête à être récupérée à ${pharmacyName}.${notes ? '\n\n' + notes : ''}`
+    }
     switch (prescription.status) {
       case 'sent_by_doctor':
         return `Votre médecin a envoyé une nouvelle ordonnance à votre pharmacie.`
@@ -83,6 +37,75 @@ export default function PatientPrescriptionNotifications({ userId }) {
         return `Mise à jour de votre ordonnance.`
     }
   }
+
+  useEffect(() => {
+    const loadNotifications = async () => {
+      try {
+        // Charger les ordonnances depuis l'API backend
+        const response = await api.get('/api/prescriptions')
+        const allPrescriptions = response.data.prescriptions || response.data || []
+        
+        // Filtrer les ordonnances du patient
+        const patientPrescriptions = allPrescriptions.filter(p => 
+          p.patientId?.userId?._id?.toString() === userId?.toString() ||
+          p.patientId?.userId?.toString() === userId?.toString() ||
+          p.patientId?._id?.toString() === userId?.toString()
+        )
+
+        // Créer des notifications pour les changements de statut
+        const newNotifications = []
+        const currentStatuses = {}
+        
+        patientPrescriptions.forEach(prescription => {
+          const prescId = prescription._id.toString()
+          currentStatuses[prescId] = prescription.status
+          
+          // Si le statut a changé vers "filled", créer une notification
+          if (prescription.status === 'filled' && previousStatusesRef.current[prescId] !== 'filled') {
+            const notificationMessage = getPrescriptionMessage(prescription)
+            
+            // Afficher une notification toast visible
+            showInfo(notificationMessage, 8000)
+            
+            newNotifications.push({
+              id: `notif_${prescId}_${Date.now()}`,
+              type: 'prescription_ready',
+              title: 'Vos médicaments sont prêts !',
+              message: notificationMessage,
+              timestamp: prescription.pharmacy?.filledAt || prescription.updatedAt || prescription.createdAt,
+              isRead: false,
+              prescriptionId: prescription._id,
+              status: prescription.status,
+              pharmacy: prescription.pharmacyId,
+              notes: prescription.pharmacy?.notes
+            })
+          }
+        })
+        
+        previousStatusesRef.current = currentStatuses
+        
+        // Ajouter les nouvelles notifications aux existantes
+        if (newNotifications.length > 0) {
+          setNotifications(prev => {
+            const combined = [...prev, ...newNotifications]
+            // Garder seulement les 20 dernières notifications
+            return combined.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp)).slice(0, 20)
+          })
+          
+          setUnreadCount(prev => prev + newNotifications.length)
+        }
+      } catch (error) {
+        console.error('Error loading notifications:', error)
+      }
+    }
+
+    loadNotifications()
+    
+    // Rafraîchir toutes les 30 secondes pour détecter les nouveaux changements
+    const interval = setInterval(loadNotifications, 30000)
+    
+    return () => clearInterval(interval)
+  }, [userId])
 
   const markAsRead = (notificationId) => {
     setNotifications(prev => 
@@ -137,7 +160,7 @@ export default function PatientPrescriptionNotifications({ userId }) {
       >
         <Bell className="w-6 h-6" />
         {unreadCount > 0 && (
-          <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center font-bold">
+          <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full h-6 w-6 flex items-center justify-center font-bold animate-pulse ring-2 ring-red-300 shadow-lg">
             {unreadCount > 9 ? '9+' : unreadCount}
           </span>
         )}
@@ -175,8 +198,8 @@ export default function PatientPrescriptionNotifications({ userId }) {
                   .map((notification) => (
                     <div
                       key={notification.id}
-                      className={`p-4 rounded-xl border-2 transition-all duration-200 hover:shadow-md ${getNotificationColor(notification.status)} ${
-                        !notification.isRead ? 'ring-2 ring-primary-200' : ''
+                      className={`p-4 rounded-xl border-2 transition-all duration-200 hover:shadow-lg hover:scale-105 ${getNotificationColor(notification.status)} ${
+                        !notification.isRead ? 'ring-4 ring-primary-300 shadow-lg animate-pulse' : ''
                       }`}
                     >
                       <div className="flex items-start space-x-3">

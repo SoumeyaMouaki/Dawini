@@ -14,12 +14,14 @@ import Login from './pages/Login.jsx'
 import TestPage from './pages/TestPage.jsx'
 import ProtectedRoute from './routes/ProtectedRoute.jsx'
 import { AuthProvider } from './context/AuthContext.jsx'
+import { ToastProvider } from './context/ToastContext.jsx'
 import './i18n.js'
 
 export default function App() {
   return (
     <AuthProvider>
-      <div className="min-h-screen bg-secondary-50">
+      <ToastProvider>
+        <div className="min-h-screen bg-secondary-50">
         <Navbar />
         <main>
           <Routes>
@@ -80,6 +82,7 @@ export default function App() {
           </Routes>
         </main>
       </div>
+      </ToastProvider>
     </AuthProvider>
   )
 }

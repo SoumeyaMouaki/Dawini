@@ -3,6 +3,7 @@ import { Send, Paperclip, Smile, MoreVertical, Phone, Video, Info, MessageSquare
 import api from '../api/axios.js'
 import NotificationBadge from './NotificationBadge.jsx'
 import { messageRateLimiter, makeRateLimitedRequest } from '../utils/rateLimiter.js'
+import { useToast } from '../context/ToastContext.jsx'
 
 export default function ChatSystem({ 
   currentUser, 
@@ -19,6 +20,9 @@ export default function ChatSystem({
   const [unreadCounts, setUnreadCounts] = useState({})
   const messagesEndRef = useRef(null)
   const messagesContainerRef = useRef(null)
+  const previousMessagesRef = useRef({}) // Track previous messages to detect new ones
+  const previousMessageCountsRef = useRef({}) // Track message counts per conversation
+  const { showMessage } = useToast()
 
   // Load conversations
   useEffect(() => {
@@ -29,7 +33,7 @@ export default function ChatSystem({
         const conversationsData = response.data.conversations || []
         setConversations(conversationsData)
         
-        // Calculate unread counts for each conversation
+        // Calculate unread counts for each conversation and detect new messages
         const counts = {}
         for (const conversation of conversationsData) {
           try {
@@ -41,6 +45,29 @@ export default function ChatSystem({
               !msg.readBy?.some(read => read.userId === currentUser._id || read.userId === currentUser.id)
             ).length
             counts[conversation._id] = unreadCount
+            
+            // Detect new messages (only if not currently viewing this conversation)
+            if (selectedConversation?._id !== conversation._id) {
+              const previousCount = previousMessageCountsRef.current[conversation._id] || 0
+              if (conversationMessages.length > previousCount) {
+                // New messages arrived - get the new ones
+                const newMessages = conversationMessages.slice(previousCount)
+                newMessages.forEach(msg => {
+                  const isFromOtherUser = msg.senderId?._id?.toString() !== currentUser._id?.toString() &&
+                                         msg.senderId?._id?.toString() !== currentUser.id?.toString()
+                  if (isFromOtherUser) {
+                    const senderName = msg.senderId?.fullName || 
+                                      msg.senderId?.userId?.fullName || 
+                                      'Quelqu\'un'
+                    const messagePreview = msg.content?.length > 50 
+                      ? msg.content.substring(0, 50) + '...' 
+                      : msg.content
+                    showMessage(messagePreview, senderName, 6000)
+                  }
+                })
+              }
+              previousMessageCountsRef.current[conversation._id] = conversationMessages.length
+            }
           } catch (error) {
             console.error('Error loading messages for conversation:', conversation._id, error)
             counts[conversation._id] = 0
@@ -68,8 +95,12 @@ export default function ChatSystem({
 
     if (currentUser) {
       loadConversations()
+      
+      // Refresh conversations every 15 seconds to detect new messages
+      const interval = setInterval(loadConversations, 15000)
+      return () => clearInterval(interval)
     }
-  }, [currentUser, onConversationSelect, selectedConversation])
+  }, [currentUser, onConversationSelect, selectedConversation, showMessage])
 
   // Load messages for selected conversation
   useEffect(() => {
@@ -78,7 +109,35 @@ export default function ChatSystem({
 
       try {
         const response = await api.get(`/api/messages/${selectedConversation._id}`)
-        setMessages(response.data.messages || [])
+        const newMessages = response.data.messages || []
+        
+        // Detect new messages (not sent by current user and not already seen)
+        if (previousMessagesRef.current[selectedConversation._id]) {
+          const previousMessageIds = new Set(
+            previousMessagesRef.current[selectedConversation._id].map(m => m._id?.toString())
+          )
+          
+          newMessages.forEach(msg => {
+            const msgId = msg._id?.toString()
+            const isNewMessage = !previousMessageIds.has(msgId)
+            const isFromOtherUser = msg.senderId?._id?.toString() !== currentUser._id?.toString() &&
+                                   msg.senderId?._id?.toString() !== currentUser.id?.toString()
+            
+            if (isNewMessage && isFromOtherUser) {
+              // Show toast notification for new message
+              const senderName = msg.senderId?.fullName || 
+                                msg.senderId?.userId?.fullName || 
+                                'Quelqu\'un'
+              const messagePreview = msg.content?.length > 50 
+                ? msg.content.substring(0, 50) + '...' 
+                : msg.content
+              showMessage(messagePreview, senderName, 6000)
+            }
+          })
+        }
+        
+        setMessages(newMessages)
+        previousMessagesRef.current[selectedConversation._id] = newMessages
         
         // Mark conversation as read when messages are loaded
         markConversationAsRead(selectedConversation._id)
@@ -89,7 +148,7 @@ export default function ChatSystem({
     }
 
     loadMessages()
-  }, [selectedConversation])
+  }, [selectedConversation, currentUser, showMessage])
 
   // Mark conversation as read
   const markConversationAsRead = async (conversationId) => {
@@ -152,7 +211,33 @@ export default function ChatSystem({
           messageRateLimiter,
           () => api.get(`/api/messages/${selectedConversation._id}`)
         )
-        setMessages(response.data.messages || [])
+        const newMessages = response.data.messages || []
+        
+        // Detect new messages
+        const previousMessageIds = new Set(
+          (previousMessagesRef.current[selectedConversation._id] || []).map(m => m._id?.toString())
+        )
+        
+        newMessages.forEach(msg => {
+          const msgId = msg._id?.toString()
+          const isNewMessage = !previousMessageIds.has(msgId)
+          const isFromOtherUser = msg.senderId?._id?.toString() !== currentUser._id?.toString() &&
+                                 msg.senderId?._id?.toString() !== currentUser.id?.toString()
+          
+          if (isNewMessage && isFromOtherUser) {
+            // Show toast notification for new message
+            const senderName = msg.senderId?.fullName || 
+                              msg.senderId?.userId?.fullName || 
+                              'Quelqu\'un'
+            const messagePreview = msg.content?.length > 50 
+              ? msg.content.substring(0, 50) + '...' 
+              : msg.content
+            showMessage(messagePreview, senderName, 6000)
+          }
+        })
+        
+        setMessages(newMessages)
+        previousMessagesRef.current[selectedConversation._id] = newMessages
       } catch (error) {
         console.error('Error refreshing messages:', error)
         // Stop refreshing on error to prevent spam
@@ -161,7 +246,7 @@ export default function ChatSystem({
     }, 30000) // Increased from 5s to 30s
 
     return () => clearInterval(interval)
-  }, [selectedConversation])
+  }, [selectedConversation, currentUser, showMessage])
 
   const sendMessage = async (e) => {
     e.preventDefault()

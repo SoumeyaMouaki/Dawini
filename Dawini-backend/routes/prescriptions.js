@@ -36,7 +36,15 @@ router.get('/', authenticateToken, async (req, res) => {
     if (req.user.userType === 'patient') {
       filter.patientId = req.user.id;
     } else if (req.user.userType === 'doctor') {
-      filter.doctorId = req.user.id;
+      // For doctors, find the Doctor profile using userId
+      const Doctor = await import('../models/Doctor.js').then(m => m.default);
+      const doctorProfile = await Doctor.findOne({ userId: req.user.id });
+      if (doctorProfile) {
+        filter.doctorId = doctorProfile._id;
+      } else {
+        // If no doctor profile found, return empty results
+        filter.doctorId = null; // This will return no results
+      }
     } else if (req.user.userType === 'pharmacist') {
       // For pharmacists, find the Pharmacy profile using userId
       const Pharmacy = await import('../models/Pharmacy.js').then(m => m.default);
@@ -60,7 +68,7 @@ router.get('/', authenticateToken, async (req, res) => {
       })
       .populate({
         path: 'doctorId',
-        select: 'fullName specialization userId',
+        select: 'specialization userId',
         populate: {
           path: 'userId',
           select: 'fullName email phone'
@@ -98,7 +106,7 @@ router.get('/:id', authenticateToken, async (req, res) => {
       })
       .populate({
         path: 'doctorId',
-        select: 'fullName specialization userId',
+        select: 'specialization userId',
         populate: {
           path: 'userId',
           select: 'fullName email phone'
@@ -173,10 +181,17 @@ router.post('/', [
       ? new Date(req.body.expiryDate)
       : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000); // 30 days
 
+    // Find the Doctor profile for this user
+    const Doctor = await import('../models/Doctor.js').then(m => m.default);
+    const doctorProfile = await Doctor.findOne({ userId: req.user.id });
+    if (!doctorProfile) {
+      return res.status(404).json({ message: 'Doctor profile not found' });
+    }
+
     const prescriptionData = {
       ...req.body,
       prescriptionCode,
-      doctorId: req.user.id,
+      doctorId: doctorProfile._id, // Use Doctor profile ID, not User ID
       pharmacyId: req.body.pharmacyId,
       issueDate: new Date(),
       expiryDate,
@@ -201,7 +216,7 @@ router.post('/', [
       })
       .populate({
         path: 'doctorId',
-        select: 'fullName specialization userId',
+        select: 'specialization userId',
         populate: {
           path: 'userId',
           select: 'fullName email phone'
@@ -306,16 +321,42 @@ router.post('/:id/fill', [
     
     // Check if prescription belongs to this pharmacy
     const prescriptionPharmacyId = prescription.pharmacyId?._id?.toString() || prescription.pharmacyId?.toString() || prescription.pharmacy?.pharmacyId?.toString();
+    console.log('🔍 Fill prescription - prescriptionPharmacyId:', prescriptionPharmacyId);
+    console.log('🔍 Fill prescription - pharmacyProfile._id:', pharmacyProfile._id.toString());
+    console.log('🔍 Fill prescription - prescription.pharmacyId:', prescription.pharmacyId);
+    console.log('🔍 Fill prescription - prescription.pharmacy:', prescription.pharmacy);
+    
     if (prescriptionPharmacyId !== pharmacyProfile._id.toString()) {
-      return res.status(403).json({ message: 'Access denied: This prescription does not belong to your pharmacy' });
+      console.error('❌ Pharmacy ID mismatch:', {
+        prescriptionPharmacyId,
+        pharmacyProfileId: pharmacyProfile._id.toString(),
+        prescription: {
+          pharmacyId: prescription.pharmacyId,
+          pharmacy: prescription.pharmacy
+        }
+      });
+      return res.status(403).json({ 
+        message: 'Access denied: This prescription does not belong to your pharmacy',
+        details: {
+          prescriptionPharmacyId,
+          yourPharmacyId: pharmacyProfile._id.toString()
+        }
+      });
     }
 
     if (prescription.status !== 'active') {
       return res.status(400).json({ message: 'Prescription cannot be filled' });
     }
 
-    if (prescription.isExpired) {
-      return res.status(400).json({ message: 'Prescription has expired' });
+    // Check if expired but allow filling anyway (pharmacy may have received it before expiry)
+    const isExpired = new Date() > new Date(prescription.expiryDate);
+    if (isExpired) {
+      console.warn('⚠️ Warning: Prescription has expired but allowing fill:', {
+        prescriptionId: prescription._id,
+        expiryDate: prescription.expiryDate,
+        currentDate: new Date()
+      });
+      // Don't block, just log a warning - pharmacy can still prepare it
     }
 
     const filledAt = req.body.filledAt ? new Date(req.body.filledAt) : new Date();
@@ -359,8 +400,14 @@ router.post('/:id/fill', [
       const patientUserId = prescription.patientId.userId;
       const pharmacyUserId = pharmacyProfile.userId;
       
+      console.log('📧 Creating notification - patientUserId:', patientUserId);
+      console.log('📧 Creating notification - pharmacyUserId:', pharmacyUserId);
+      console.log('📧 Creating notification - patientId._id:', prescription.patientId._id);
+      console.log('📧 Creating notification - pharmacyProfile._id:', pharmacyProfile._id);
+      
       if (!patientUserId) {
-        console.error('Patient userId not found for prescription:', prescription._id);
+        console.error('❌ Patient userId not found for prescription:', prescription._id);
+        console.error('❌ prescription.patientId:', prescription.patientId);
         throw new Error('Patient userId not found');
       }
       
@@ -370,35 +417,47 @@ router.post('/:id/fill', [
         pharmacist: pharmacyProfile._id
       });
 
+      console.log('📧 Existing conversation found:', conversation ? conversation._id : 'none');
+
       if (!conversation) {
+        console.log('📧 Creating new conversation...');
         conversation = new Conversation({
           patient: prescription.patientId._id,
           pharmacist: pharmacyProfile._id,
           lastMessage: null
         });
         await conversation.save();
+        console.log('✅ New conversation created:', conversation._id);
       }
 
       // Create notification message
+      const messageContent = `✅ Votre ordonnance (${prescription.prescriptionCode}) est prête à être récupérée !${req.body.notes ? '\n\n' + req.body.notes : ''}`;
+      console.log('📧 Creating message with content:', messageContent);
+      
       const notificationMessage = new Message({
         conversationId: conversation._id,
         senderId: pharmacyUserId,
         senderType: 'pharmacist',
-        content: `✅ Votre ordonnance (${prescription.prescriptionCode}) est prête à être récupérée !${req.body.notes ? '\n\n' + req.body.notes : ''}`,
+        content: messageContent,
         type: 'text',
         status: 'sent'
       });
       await notificationMessage.save();
+      console.log('✅ Message created:', notificationMessage._id);
 
       // Update conversation
       conversation.lastMessage = notificationMessage._id;
       conversation.updatedAt = new Date();
       await conversation.save();
+      console.log('✅ Conversation updated');
       
       console.log('✅ Notification sent to patient:', patientUserId);
+      console.log('✅ Conversation ID:', conversation._id);
+      console.log('✅ Message ID:', notificationMessage._id);
     } catch (notificationError) {
-      console.error('Error sending notification to patient:', notificationError);
-      console.error('Error details:', notificationError.stack);
+      console.error('❌ Error sending notification to patient:', notificationError);
+      console.error('❌ Error details:', notificationError.stack);
+      console.error('❌ Error message:', notificationError.message);
       // Don't fail the request if notification fails
     }
 

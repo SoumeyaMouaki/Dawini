@@ -9,45 +9,27 @@ export default function PrescriptionsList({ userId }) {
 
   useEffect(() => {
     fetchPrescriptions()
+    
+    // Rafraîchir toutes les 30 secondes pour détecter les changements de statut
+    const interval = setInterval(fetchPrescriptions, 30000)
+    return () => clearInterval(interval)
   }, [userId])
 
   const fetchPrescriptions = async () => {
     try {
       setIsLoading(true)
-      // Simulate API call - replace with actual endpoint
-      await new Promise(resolve => setTimeout(resolve, 1000))
+      setError('')
       
-      // Mock data for demonstration
-      const mockPrescriptions = [
-        {
-          _id: '1',
-          doctorName: 'Dr. Ahmed Benali',
-          specialization: 'Cardiologie',
-          date: '2024-01-15',
-          medications: [
-            { name: 'Aspirine', dosage: '100mg', frequency: '1 fois par jour', duration: '30 jours' },
-            { name: 'Atorvastatine', dosage: '20mg', frequency: '1 fois par jour', duration: '90 jours' }
-          ],
-          instructions: 'Prendre avec de l\'eau, éviter l\'alcool',
-          status: 'active'
-        },
-        {
-          _id: '2',
-          doctorName: 'Dr. Fatima Zohra',
-          specialization: 'Dermatologie',
-          date: '2024-01-10',
-          medications: [
-            { name: 'Crème hydratante', dosage: '50g', frequency: '2 fois par jour', duration: '15 jours' }
-          ],
-          instructions: 'Appliquer sur peau propre et sèche',
-          status: 'completed'
-        }
-      ]
+      // Charger les ordonnances depuis l'API backend
+      const response = await api.get('/api/prescriptions')
+      const prescriptionsData = response.data.prescriptions || response.data || []
       
-      setPrescriptions(mockPrescriptions)
+      console.log('📋 Loaded prescriptions for patient:', prescriptionsData.length)
+      setPrescriptions(prescriptionsData)
     } catch (error) {
       console.error('Error fetching prescriptions:', error)
       setError('Erreur lors du chargement des ordonnances')
+      setPrescriptions([])
     } finally {
       setIsLoading(false)
     }
@@ -115,7 +97,14 @@ export default function PrescriptionsList({ userId }) {
       ) : (
         <div className="space-y-6">
           {prescriptions.map(prescription => (
-            <div key={prescription._id} className="bg-gradient-to-r from-green-50 to-emerald-50 border-2 border-green-200 rounded-2xl p-8 hover:shadow-2xl transition-all duration-300 hover:-translate-y-2 hover:border-green-300">
+            <div 
+              key={prescription._id} 
+              className={`rounded-2xl p-8 hover:shadow-2xl transition-all duration-300 hover:-translate-y-2 ${
+                prescription.status === 'filled' 
+                  ? 'bg-gradient-to-r from-blue-50 to-cyan-50 border-2 border-blue-300 hover:border-blue-400 ring-2 ring-blue-200' 
+                  : 'bg-gradient-to-r from-green-50 to-emerald-50 border-2 border-green-200 hover:border-green-300'
+              }`}
+            >
               <div className="flex items-start justify-between">
                 <div className="flex-1">
                   <div className="flex items-center space-x-6 mb-4">
@@ -124,22 +113,41 @@ export default function PrescriptionsList({ userId }) {
                     </div>
                     <div>
                       <h4 className="font-bold text-gray-900 text-xl mb-2">
-                        {prescription.doctorName}
+                        Dr. {prescription.doctorId?.userId?.fullName || prescription.doctorId?.fullName || 'Médecin inconnu'}
                       </h4>
-                      <p className="text-green-600 font-semibold text-lg mb-2">{prescription.specialization}</p>
+                      <p className="text-green-600 font-semibold text-lg mb-2">{prescription.doctorId?.specialization || 'Spécialité non spécifiée'}</p>
                       <div className="flex items-center text-gray-600 mb-2">
                         <Calendar className="w-5 h-5 mr-2" />
-                        <span className="text-lg">{new Date(prescription.date).toLocaleDateString('fr-FR')}</span>
+                        <span className="text-lg">{new Date(prescription.issueDate || prescription.createdAt).toLocaleDateString('fr-FR')}</span>
                       </div>
                       <span className={`px-4 py-2 rounded-xl text-sm font-bold ${
                         prescription.status === 'active' ? 'bg-green-100 text-green-800 border-2 border-green-300' :
+                        prescription.status === 'filled' ? 'bg-blue-100 text-blue-800 border-2 border-blue-300 animate-pulse' :
                         prescription.status === 'completed' ? 'bg-blue-100 text-blue-800 border-2 border-blue-300' :
                         'bg-gray-100 text-gray-800 border-2 border-gray-300'
                       }`}>
                         {prescription.status === 'active' ? '✅ Active' :
+                         prescription.status === 'filled' ? '🔔 Prête à récupérer !' :
                          prescription.status === 'completed' ? '✅ Terminée' :
                          prescription.status}
                       </span>
+                      {prescription.status === 'filled' && (
+                        <div className="mt-3 bg-blue-50 border-2 border-blue-300 rounded-lg p-4">
+                          <p className="text-sm font-bold text-blue-900 mb-2">
+                            🎉 Votre ordonnance est prête !
+                          </p>
+                          {prescription.pharmacy?.notes && (
+                            <p className="text-sm text-blue-800">
+                              <strong>Message de la pharmacie :</strong> {prescription.pharmacy.notes}
+                            </p>
+                          )}
+                          {prescription.pharmacyId?.pharmacyName && (
+                            <p className="text-sm text-blue-700 mt-2">
+                              <strong>Pharmacie :</strong> {prescription.pharmacyId.pharmacyName}
+                            </p>
+                          )}
+                        </div>
+                      )}
                     </div>
                   </div>
                   

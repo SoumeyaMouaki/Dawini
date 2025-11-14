@@ -49,6 +49,7 @@ router.get('/conversations', async (req, res) => {
       query.pharmacist = currentUserProfileId;
     }
 
+    console.log('📧 Loading conversations - userType:', userType, 'currentUserProfileId:', currentUserProfileId, 'query:', query);
     const conversations = await Conversation.find(query)
       .populate('patient', 'userId')
       .populate('doctor', 'userId')
@@ -67,6 +68,17 @@ router.get('/conversations', async (req, res) => {
         select: 'fullName email profilePicture'
       })
       .sort({ updatedAt: -1 });
+
+    console.log('📧 Found conversations:', conversations.length);
+    conversations.forEach(conv => {
+      console.log('📧 Conversation:', {
+        _id: conv._id,
+        patient: conv.patient?._id,
+        doctor: conv.doctor?._id,
+        pharmacist: conv.pharmacist?._id,
+        lastMessage: conv.lastMessage?._id
+      });
+    });
 
     res.json({
       success: true,

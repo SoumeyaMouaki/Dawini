@@ -433,9 +433,9 @@ export default function PatientDashboard() {
               </div>
             </button>
             <button
-              onClick={() => setActiveTab('messages')}
+              onClick={() => setActiveSection('messages')}
               className={`py-6 px-4 border-b-3 font-semibold text-base transition-all duration-200 ${
-                activeTab === 'messages'
+                activeSection === 'messages'
                   ? 'border-primary-500 text-primary-600 bg-primary-50'
                   : 'border-transparent text-gray-500 hover:text-primary-500 hover:border-primary-300 hover:bg-primary-25'
               }`}
@@ -877,7 +877,7 @@ export default function PatientDashboard() {
                 </div>
                 <div className="space-y-4">
                   <button 
-                    onClick={() => setActiveTab('messages')}
+                    onClick={() => setActiveSection('messages')}
                     className="w-full bg-gradient-to-r from-blue-100 to-blue-200 hover:from-blue-200 hover:to-blue-300 border-2 border-blue-300 rounded-2xl p-6 flex items-center justify-center transition-all duration-200 hover:-translate-y-1 hover:shadow-lg group"
                   >
                     <div className="flex items-center space-x-4">
@@ -957,9 +957,17 @@ export default function PatientDashboard() {
             console.log('User updated:', updatedUser)
           }} />
         </div>
-      ) : activeTab === 'messages' ? (
+      ) : activeSection === 'messages' ? (
         /* Messages Tab */
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+          <div className="mb-6">
+            <button
+              onClick={() => setActiveSection('dashboard')}
+              className="btn-outline border-2 border-primary-500 text-primary-500 hover:bg-primary-500 hover:text-white font-bold px-6 py-2 rounded-xl shadow-lg hover:shadow-xl transform hover:-translate-y-1 transition-all duration-200 mb-4"
+            >
+              ← Retour au tableau de bord
+            </button>
+          </div>
           <div className="flex items-center justify-between mb-6">
             <h2 className="text-2xl font-bold text-gray-900">Messages</h2>
             <button
@@ -986,7 +994,7 @@ export default function PatientDashboard() {
         onClose={() => setIsNewConversationOpen(false)}
         onConversationCreated={(conversation) => {
           setSelectedConversation(conversation)
-          setActiveTab('messages')
+          setActiveSection('messages')
         }}
         currentUser={user}
       />

@@ -24,6 +24,7 @@ import { useAuth } from '../context/AuthContext.jsx'
 
 export default function PharmacyPrescriptionsList({ pharmacyId = null }) {
   const { user } = useAuth()
+  console.log('🏥 PharmacyPrescriptionsList rendered - user:', user?.id || user?._id, 'pharmacyId:', pharmacyId)
   const [filter, setFilter] = useState('all')
   const [searchTerm, setSearchTerm] = useState('')
   const [prescriptions, setPrescriptions] = useState([])
@@ -36,7 +37,10 @@ export default function PharmacyPrescriptionsList({ pharmacyId = null }) {
 
   // Charger les ordonnances depuis l'API backend
   useEffect(() => {
+    console.log('🔄 useEffect triggered - user:', user, 'pharmacyId:', pharmacyId, 'filter:', filter)
+    
     const loadPrescriptions = async () => {
+      console.log('📥 Starting to load prescriptions...')
       setIsLoading(true)
       setError(null)
       try {
@@ -82,7 +86,14 @@ export default function PharmacyPrescriptionsList({ pharmacyId = null }) {
         })
         
         const prescriptionsData = response.data.prescriptions || response.data || []
-        console.log('Loaded prescriptions:', prescriptionsData.length, prescriptionsData)
+        console.log('✅ Loaded prescriptions:', prescriptionsData.length)
+        if (prescriptionsData.length > 0) {
+          console.log('📋 First prescription sample:', prescriptionsData[0])
+          console.log('👤 Patient data:', prescriptionsData[0].patientId)
+          console.log('👨‍⚕️ Doctor data:', prescriptionsData[0].doctorId)
+          console.log('👨‍⚕️ Doctor userId:', prescriptionsData[0].doctorId?.userId)
+          console.log('👨‍⚕️ Doctor userId fullName:', prescriptionsData[0].doctorId?.userId?.fullName)
+        }
         setPrescriptions(prescriptionsData)
       } catch (error) {
         console.error('Error loading prescriptions:', error)
@@ -94,17 +105,29 @@ export default function PharmacyPrescriptionsList({ pharmacyId = null }) {
     }
 
     if (user) {
+      console.log('✅ User exists, loading prescriptions...')
       loadPrescriptions()
       
       // Refresh every 30 seconds to get new prescriptions
-      const interval = setInterval(loadPrescriptions, 30000)
-      return () => clearInterval(interval)
+      const interval = setInterval(() => {
+        console.log('🔄 Auto-refreshing prescriptions...')
+        loadPrescriptions()
+      }, 30000)
+      return () => {
+        console.log('🧹 Cleaning up interval')
+        clearInterval(interval)
+      }
+    } else {
+      console.log('❌ No user, skipping prescription load')
     }
   }, [pharmacyId, user, filter])
 
   // Ouvrir la modal de détails
   const handleViewDetails = (prescription) => {
-    console.log('Opening prescription details:', prescription)
+    console.log('🔍 Opening prescription details:', prescription._id)
+    console.log('👨‍⚕️ Doctor data:', prescription.doctorId)
+    console.log('👨‍⚕️ Doctor userId:', prescription.doctorId?.userId)
+    console.log('👨‍⚕️ Doctor userId fullName:', prescription.doctorId?.userId?.fullName)
     setSelectedPrescription(prescription)
     setIsDetailModalOpen(true)
   }
@@ -146,8 +169,11 @@ export default function PharmacyPrescriptionsList({ pharmacyId = null }) {
       alert('✅ Ordonnance marquée comme prête ! Le patient a été notifié par message.')
       
     } catch (error) {
-      console.error('Error marking prescription as ready:', error)
-      const errorMessage = error.response?.data?.message || error.response?.data?.error || 'Erreur lors de la préparation de l\'ordonnance'
+      console.error('❌ Error marking prescription as ready:', error)
+      console.error('❌ Error response:', error.response?.data)
+      console.error('❌ Error status:', error.response?.status)
+      console.error('❌ Error message:', error.message)
+      const errorMessage = error.response?.data?.message || error.response?.data?.error || error.message || 'Erreur lors de la préparation de l\'ordonnance'
       setError(errorMessage)
       alert(`❌ Erreur: ${errorMessage}`)
     } finally {
@@ -190,12 +216,22 @@ export default function PharmacyPrescriptionsList({ pharmacyId = null }) {
       (filter === 'pending' && prescription.status === 'active') ||
       prescription.status === filter
     const matchesSearch = !searchTerm || 
+      prescription.patientId?.userId?.fullName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       prescription.patientId?.fullName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      prescription.doctorId?.userId?.fullName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       prescription.doctorId?.fullName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       prescription.diagnosis?.toLowerCase().includes(searchTerm.toLowerCase())
     
     return matchesFilter && matchesSearch
   })
+  
+  console.log('🔍 Filtered prescriptions:', filteredPrescriptions.length)
+  console.log('📊 Total prescriptions:', prescriptions.length)
+  console.log('🔎 Filter:', filter, 'Search:', searchTerm)
+  if (filteredPrescriptions.length > 0) {
+    console.log('🎴 First filtered prescription doctor:', filteredPrescriptions[0].doctorId)
+    console.log('🎴 First filtered prescription:', filteredPrescriptions[0])
+  }
 
   const getStatusColor = (status) => {
     switch (status) {
@@ -346,7 +382,21 @@ export default function PharmacyPrescriptionsList({ pharmacyId = null }) {
             <div 
               key={prescription._id} 
               className="bg-white rounded-2xl p-6 shadow-xl border border-gray-200 hover:shadow-2xl transition-all duration-300 cursor-pointer"
-              onClick={() => handleViewDetails(prescription)}
+              onClick={(e) => {
+                console.log('🖱️ onClick triggered on card:', prescription._id)
+                e.preventDefault()
+                e.stopPropagation()
+                console.log('🖱️ Card clicked:', prescription._id)
+                handleViewDetails(prescription)
+              }}
+              role="button"
+              tabIndex={0}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault()
+                  handleViewDetails(prescription)
+                }
+              }}
             >
               <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between space-y-4 lg:space-y-0">
                 <div className="flex-1">
@@ -369,11 +419,20 @@ export default function PharmacyPrescriptionsList({ pharmacyId = null }) {
                         <div>
                           <p className="text-sm text-gray-500 mb-1">Médecin</p>
                           <p className="font-semibold text-gray-900">
-                            Dr. {prescription.doctorId?.userId?.fullName || prescription.doctorId?.fullName || 'Médecin inconnu'}
+                            {prescription.doctorId?.userId?.fullName 
+                              ? `Dr. ${prescription.doctorId.userId.fullName}` 
+                              : prescription.doctorId?.fullName 
+                                ? `Dr. ${prescription.doctorId.fullName}`
+                                : 'Médecin inconnu'}
                           </p>
                           <p className="text-sm text-gray-600">
                             {prescription.doctorId?.specialization || 'Spécialité non spécifiée'}
                           </p>
+                          {process.env.NODE_ENV === 'development' && (
+                            <p className="text-xs text-gray-400 mt-1">
+                              Debug: {prescription.doctorId ? (prescription.doctorId.userId ? 'userId exists' : 'no userId') : 'no doctorId'}
+                            </p>
+                          )}
                         </div>
                         
                         <div>
@@ -434,7 +493,10 @@ export default function PharmacyPrescriptionsList({ pharmacyId = null }) {
 
                   <div className="flex items-center space-x-2" onClick={(e) => e.stopPropagation()}>
                     <button
-                      onClick={() => handleViewDetails(prescription)}
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        handleViewDetails(prescription)
+                      }}
                       className="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors flex items-center"
                     >
                       <Eye className="w-4 h-4 mr-1" />

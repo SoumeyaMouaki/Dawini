@@ -548,9 +548,7 @@ export default function PharmacyDashboard() {
       ) : activeTab === 'prescriptions' ? (
         /* Prescriptions Tab */
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-          <PharmacyPrescriptionsList 
-            pharmacyId="pharmacy_1"
-          />
+          <PharmacyPrescriptionsList />
         </div>
       ) : activeTab === 'settings' ? (
         /* Settings Tab */

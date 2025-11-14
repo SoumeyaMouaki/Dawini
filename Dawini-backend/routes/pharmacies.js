@@ -20,7 +20,16 @@ router.get('/', async (req, res) => {
       sortOrder = 'asc'
     } = req.query;
 
-    const filter = { isVerified: true, isActive: true };
+    // Make filters optional for development - only apply if explicitly set
+    const filter = {};
+    
+    // Only filter by isVerified/isActive if they exist in the query, otherwise return all
+    if (req.query.isVerified !== undefined) {
+      filter.isVerified = req.query.isVerified === 'true';
+    }
+    if (req.query.isActive !== undefined) {
+      filter.isActive = req.query.isActive === 'true';
+    }
     
     if (services) {
       const serviceArray = services.split(',');

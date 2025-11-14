@@ -38,12 +38,34 @@ router.get('/', authenticateToken, async (req, res) => {
     } else if (req.user.userType === 'doctor') {
       filter.doctorId = req.user.id;
     } else if (req.user.userType === 'pharmacist') {
-      filter.pharmacyId = req.user.id;
+      // For pharmacists, find the Pharmacy profile using userId
+      const Pharmacy = await import('../models/Pharmacy.js').then(m => m.default);
+      const pharmacyProfile = await Pharmacy.findOne({ userId: req.user.id });
+      if (pharmacyProfile) {
+        filter.pharmacyId = pharmacyProfile._id;
+      } else {
+        // If no pharmacy profile found, return empty results
+        filter.pharmacyId = null; // This will return no results
+      }
     }
 
     const prescriptions = await Prescription.find(filter)
-      .populate('patientId', 'fullName')
-      .populate('doctorId', 'fullName specialization')
+      .populate({
+        path: 'patientId',
+        select: 'fullName userId',
+        populate: {
+          path: 'userId',
+          select: 'fullName email phone'
+        }
+      })
+      .populate({
+        path: 'doctorId',
+        select: 'fullName specialization userId',
+        populate: {
+          path: 'userId',
+          select: 'fullName email phone'
+        }
+      })
       .populate('pharmacyId', 'pharmacyName')
       .limit(limit * 1)
       .skip((page - 1) * limit)
@@ -66,8 +88,22 @@ router.get('/', authenticateToken, async (req, res) => {
 router.get('/:id', authenticateToken, async (req, res) => {
   try {
     const prescription = await Prescription.findById(req.params.id)
-      .populate('patientId', 'fullName')
-      .populate('doctorId', 'fullName specialization')
+      .populate({
+        path: 'patientId',
+        select: 'fullName userId',
+        populate: {
+          path: 'userId',
+          select: 'fullName email phone'
+        }
+      })
+      .populate({
+        path: 'doctorId',
+        select: 'fullName specialization userId',
+        populate: {
+          path: 'userId',
+          select: 'fullName email phone'
+        }
+      })
       .populate('pharmacyId', 'pharmacyName');
 
     if (!prescription) {
@@ -81,8 +117,18 @@ router.get('/:id', authenticateToken, async (req, res) => {
     if (req.user.userType === 'doctor' && prescription.doctorId._id.toString() !== req.user.id) {
       return res.status(403).json({ message: 'Access denied' });
     }
-    if (req.user.userType === 'pharmacist' && prescription.pharmacyId._id.toString() !== req.user.id) {
-      return res.status(403).json({ message: 'Access denied' });
+    if (req.user.userType === 'pharmacist') {
+      // For pharmacists, find the Pharmacy profile using userId
+      const Pharmacy = await import('../models/Pharmacy.js').then(m => m.default);
+      const pharmacyProfile = await Pharmacy.findOne({ userId: req.user.id });
+      if (!pharmacyProfile) {
+        return res.status(403).json({ message: 'Pharmacy profile not found' });
+      }
+      // Check if the prescription belongs to this pharmacy
+      const prescriptionPharmacyId = prescription.pharmacyId?._id || prescription.pharmacyId;
+      if (prescriptionPharmacyId.toString() !== pharmacyProfile._id.toString()) {
+        return res.status(403).json({ message: 'Access denied' });
+      }
     }
 
     res.json(prescription);
@@ -101,8 +147,9 @@ router.post('/', [
   body('medications.*.frequency').trim().notEmpty().withMessage('Medication frequency is required'),
   body('medications.*.duration').trim().notEmpty().withMessage('Medication duration is required'),
   body('diagnosis').trim().notEmpty().withMessage('Diagnosis is required'),
-  body('instructions').trim().notEmpty().withMessage('Instructions are required'),
-  body('expiryDate').isISO8601().withMessage('Valid expiry date is required')
+  body('instructions').optional().trim(),
+  body('pharmacyId').isMongoId().withMessage('Valid pharmacy ID is required'),
+  body('expiryDate').optional().isISO8601().withMessage('Valid expiry date is required')
 ], async (req, res) => {
   try {
     const errors = validationResult(req);
@@ -110,19 +157,57 @@ router.post('/', [
       return res.status(400).json({ errors: errors.array() });
     }
 
+    // Generate prescription code
+    let prescriptionCode;
+    let attempts = 0;
+    do {
+      prescriptionCode = Prescription.generateCode();
+      attempts++;
+      if (attempts > 10) {
+        return res.status(500).json({ message: 'Failed to generate unique prescription code' });
+      }
+    } while (await Prescription.findOne({ prescriptionCode }));
+
+    // Calculate expiry date (default: 30 days from now if not provided)
+    const expiryDate = req.body.expiryDate 
+      ? new Date(req.body.expiryDate)
+      : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000); // 30 days
+
     const prescriptionData = {
       ...req.body,
+      prescriptionCode,
       doctorId: req.user.id,
+      pharmacyId: req.body.pharmacyId,
       issueDate: new Date(),
-      status: 'active'
+      expiryDate,
+      status: 'active',
+      // Sync pharmacy.pharmacyId with pharmacyId
+      pharmacy: {
+        pharmacyId: req.body.pharmacyId
+      }
     };
 
     const prescription = new Prescription(prescriptionData);
     await prescription.save();
 
     const populatedPrescription = await Prescription.findById(prescription._id)
-      .populate('patientId', 'fullName')
-      .populate('doctorId', 'fullName specialization');
+      .populate({
+        path: 'patientId',
+        select: 'fullName userId',
+        populate: {
+          path: 'userId',
+          select: 'fullName email phone'
+        }
+      })
+      .populate({
+        path: 'doctorId',
+        select: 'fullName specialization userId',
+        populate: {
+          path: 'userId',
+          select: 'fullName email phone'
+        }
+      })
+      .populate('pharmacyId', 'pharmacyName');
 
     res.status(201).json(populatedPrescription);
   } catch (error) {
@@ -160,9 +245,23 @@ router.put('/:id', [
       req.params.id,
       updateData,
       { new: true, runValidators: true }
-    ).populate('patientId', 'fullName')
-     .populate('doctorId', 'fullName specialization')
-     .populate('pharmacyId', 'pharmacyName');
+    ).populate({
+      path: 'patientId',
+      select: 'fullName userId',
+      populate: {
+        path: 'userId',
+        select: 'fullName email phone'
+      }
+    })
+    .populate({
+      path: 'doctorId',
+      select: 'fullName specialization userId',
+      populate: {
+        path: 'userId',
+        select: 'fullName email phone'
+      }
+    })
+    .populate('pharmacyId', 'pharmacyName');
 
     res.json(updatedPrescription);
   } catch (error) {
@@ -173,8 +272,8 @@ router.put('/:id', [
 // POST /api/prescriptions/:id/fill - Fill prescription (pharmacist only)
 router.post('/:id/fill', [
   authenticateToken,
-  body('filledAt').isISO8601().withMessage('Valid fill date is required'),
-  body('filledBy').trim().notEmpty().withMessage('Pharmacist name is required'),
+  body('filledAt').optional().isISO8601().withMessage('Valid fill date is required'),
+  body('filledBy').optional().trim(),
   body('notes').optional().trim()
 ], async (req, res) => {
   try {
@@ -183,9 +282,32 @@ router.post('/:id/fill', [
       return res.status(400).json({ errors: errors.array() });
     }
 
-    const prescription = await Prescription.findById(req.params.id);
+    const prescription = await Prescription.findById(req.params.id)
+      .populate({
+        path: 'patientId',
+        select: 'fullName userId',
+        populate: {
+          path: 'userId',
+          select: 'fullName email phone'
+        }
+      })
+      .populate('pharmacyId', 'pharmacyName userId');
+    
     if (!prescription) {
       return res.status(404).json({ message: 'Prescription not found' });
+    }
+
+    // Verify pharmacist owns this pharmacy
+    const Pharmacy = await import('../models/Pharmacy.js').then(m => m.default);
+    const pharmacyProfile = await Pharmacy.findOne({ userId: req.user.id });
+    if (!pharmacyProfile) {
+      return res.status(403).json({ message: 'Access denied: Pharmacy profile not found' });
+    }
+    
+    // Check if prescription belongs to this pharmacy
+    const prescriptionPharmacyId = prescription.pharmacyId?._id?.toString() || prescription.pharmacyId?.toString() || prescription.pharmacy?.pharmacyId?.toString();
+    if (prescriptionPharmacyId !== pharmacyProfile._id.toString()) {
+      return res.status(403).json({ message: 'Access denied: This prescription does not belong to your pharmacy' });
     }
 
     if (prescription.status !== 'active') {
@@ -196,20 +318,89 @@ router.post('/:id/fill', [
       return res.status(400).json({ message: 'Prescription has expired' });
     }
 
+    const filledAt = req.body.filledAt ? new Date(req.body.filledAt) : new Date();
+    const filledBy = req.body.filledBy || pharmacyProfile.pharmacyName || 'Pharmacien';
+
     const updateData = {
       status: 'filled',
-      'pharmacy.filledAt': new Date(req.body.filledAt),
-      'pharmacy.filledBy': req.body.filledBy,
-      'pharmacy.notes': req.body.notes
+      'pharmacy.filledAt': filledAt,
+      'pharmacy.filledBy': filledBy,
+      'pharmacy.notes': req.body.notes || 'Ordonnance préparée et prête à être récupérée'
     };
 
     const updatedPrescription = await Prescription.findByIdAndUpdate(
       req.params.id,
       updateData,
       { new: true, runValidators: true }
-    ).populate('patientId', 'fullName')
-     .populate('doctorId', 'fullName specialization')
-     .populate('pharmacyId', 'pharmacyName');
+    ).populate({
+      path: 'patientId',
+      select: 'fullName userId',
+      populate: {
+        path: 'userId',
+        select: 'fullName email phone'
+      }
+    })
+    .populate({
+      path: 'doctorId',
+      select: 'fullName specialization userId',
+      populate: {
+        path: 'userId',
+        select: 'fullName email phone'
+      }
+    })
+    .populate('pharmacyId', 'pharmacyName');
+
+    // Create notification message to patient
+    try {
+      const Conversation = await import('../models/Conversation.js').then(m => m.default);
+      const Message = await import('../models/Message.js').then(m => m.default);
+      
+      // Get patient userId - it's already an ObjectId from the populate
+      const patientUserId = prescription.patientId.userId;
+      const pharmacyUserId = pharmacyProfile.userId;
+      
+      if (!patientUserId) {
+        console.error('Patient userId not found for prescription:', prescription._id);
+        throw new Error('Patient userId not found');
+      }
+      
+      // Find or create conversation between pharmacy and patient
+      let conversation = await Conversation.findOne({
+        patient: prescription.patientId._id,
+        pharmacist: pharmacyProfile._id
+      });
+
+      if (!conversation) {
+        conversation = new Conversation({
+          patient: prescription.patientId._id,
+          pharmacist: pharmacyProfile._id,
+          lastMessage: null
+        });
+        await conversation.save();
+      }
+
+      // Create notification message
+      const notificationMessage = new Message({
+        conversationId: conversation._id,
+        senderId: pharmacyUserId,
+        senderType: 'pharmacist',
+        content: `✅ Votre ordonnance (${prescription.prescriptionCode}) est prête à être récupérée !${req.body.notes ? '\n\n' + req.body.notes : ''}`,
+        type: 'text',
+        status: 'sent'
+      });
+      await notificationMessage.save();
+
+      // Update conversation
+      conversation.lastMessage = notificationMessage._id;
+      conversation.updatedAt = new Date();
+      await conversation.save();
+      
+      console.log('✅ Notification sent to patient:', patientUserId);
+    } catch (notificationError) {
+      console.error('Error sending notification to patient:', notificationError);
+      console.error('Error details:', notificationError.stack);
+      // Don't fail the request if notification fails
+    }
 
     res.json(updatedPrescription);
   } catch (error) {

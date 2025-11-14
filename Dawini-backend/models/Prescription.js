@@ -83,6 +83,12 @@ const prescriptionSchema = new mongoose.Schema({
   // Special instructions
   specialInstructions: [String],
   
+  // Pharmacy ID (for easy querying)
+  pharmacyId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Pharmacy'
+  },
+  
   // Pharmacy information
   pharmacy: {
     pharmacyId: {
@@ -134,7 +140,18 @@ const prescriptionSchema = new mongoose.Schema({
 prescriptionSchema.index({ patientId: 1, issueDate: -1 });
 prescriptionSchema.index({ doctorId: 1, issueDate: -1 });
 prescriptionSchema.index({ status: 1, expiryDate: 1 });
+prescriptionSchema.index({ pharmacyId: 1 });
 prescriptionSchema.index({ 'pharmacy.pharmacyId': 1 });
+
+// Pre-save hook to sync pharmacyId with pharmacy.pharmacyId
+prescriptionSchema.pre('save', function(next) {
+  if (this.pharmacyId && !this.pharmacy.pharmacyId) {
+    this.pharmacy.pharmacyId = this.pharmacyId;
+  } else if (this.pharmacy.pharmacyId && !this.pharmacyId) {
+    this.pharmacyId = this.pharmacy.pharmacyId;
+  }
+  next();
+});
 
 // Virtual for is expired
 prescriptionSchema.virtual('isExpired').get(function() {

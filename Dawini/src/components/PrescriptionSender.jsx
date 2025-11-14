@@ -15,7 +15,8 @@ import {
   CheckCircle,
   Building
 } from 'lucide-react'
-import prescriptionService from '../services/PrescriptionService.js'
+import api from '../api/axios.js'
+import { useAuth } from '../context/AuthContext.jsx'
 
 export default function PrescriptionSender({ 
   isOpen, 
@@ -24,12 +25,17 @@ export default function PrescriptionSender({
   onPrescriptionSent,
   selectedPatient = null 
 }) {
+  const { user } = useAuth()
   const [step, setStep] = useState(1) // 1: Patient, 2: Prescription, 3: Pharmacy, 4: Confirm
   const [selectedPatientData, setSelectedPatientData] = useState(selectedPatient)
   const [pharmacies, setPharmacies] = useState([])
   const [selectedPharmacy, setSelectedPharmacy] = useState(null)
   const [isLoading, setIsLoading] = useState(false)
   const [searchTerm, setSearchTerm] = useState('')
+  const [error, setError] = useState(null)
+  const [patients, setPatients] = useState([])
+  const [patientSearchTerm, setPatientSearchTerm] = useState('')
+  const [isLoadingPatients, setIsLoadingPatients] = useState(false)
   
   // Mock pharmacies data
   const mockPharmacies = [
@@ -96,14 +102,79 @@ export default function PrescriptionSender({
 
   useEffect(() => {
     if (isOpen) {
-      setPharmacies(mockPharmacies)
+      // Load pharmacies from API
+      const loadPharmacies = async () => {
+        try {
+          // Load more pharmacies (limit=100) and don't filter by isVerified/isActive for now
+          const response = await api.get('/api/pharmacies', {
+            params: {
+              limit: 100,
+              page: 1
+            }
+          })
+          const pharmaciesList = response.data.pharmacies || response.data || []
+          console.log('Loaded pharmacies:', pharmaciesList.length, pharmaciesList)
+          setPharmacies(pharmaciesList)
+          
+          if (pharmaciesList.length === 0) {
+            console.warn('No pharmacies found, using mock data')
+            setPharmacies(mockPharmacies)
+          }
+        } catch (error) {
+          console.error('Error loading pharmacies:', error)
+          // Fallback to mock data if API fails
+          setPharmacies(mockPharmacies)
+        }
+      }
+      loadPharmacies()
+      
       if (selectedPatient) {
         setSelectedPatientData(selectedPatient)
-        setPrescriptionData(prev => ({ ...prev, patientId: selectedPatient._id }))
+        // Use the patient's _id from the Patient model, not userId
+        const patientId = selectedPatient._id || selectedPatient.id
+        setPrescriptionData(prev => ({ ...prev, patientId }))
         setStep(2)
       }
     }
   }, [isOpen, selectedPatient])
+
+  useEffect(() => {
+    if (!patientSearchTerm || patientSearchTerm.length < 2) {
+      setPatients([])
+      return
+    }
+
+    const timeoutId = setTimeout(async () => {
+      setIsLoadingPatients(true)
+      try {
+        // Get doctor profile ID first
+        const doctorResponse = await api.get('/api/doctors')
+        const doctorProfiles = doctorResponse.data.doctors || []
+        const currentDoctorProfile = doctorProfiles.find(doctor => 
+          doctor.userId._id === user?.id || doctor.userId._id === user?._id
+        )
+        
+        if (!currentDoctorProfile) {
+          setError('Profil médecin non trouvé')
+          return
+        }
+
+        // Search patients
+        const params = new URLSearchParams()
+        params.append('name', patientSearchTerm)
+        const response = await api.get(`/api/doctors/${currentDoctorProfile._id}/patients/search?${params.toString()}`)
+        const patientsList = response.data.patients || []
+        setPatients(patientsList)
+      } catch (error) {
+        console.error('Error searching patients:', error)
+        setError('Erreur lors de la recherche de patients')
+      } finally {
+        setIsLoadingPatients(false)
+      }
+    }, 500) // Debounce search
+
+    return () => clearTimeout(timeoutId)
+  }, [patientSearchTerm, user])
 
   const handleMedicationChange = (index, field, value) => {
     const newMedications = [...prescriptionData.medications]
@@ -126,24 +197,52 @@ export default function PrescriptionSender({
   }
 
   const handleSendPrescription = async () => {
+    if (!selectedPharmacy || !selectedPatientData) {
+      setError('Veuillez sélectionner une pharmacie et un patient')
+      return
+    }
+
+    // Validate IDs are MongoDB ObjectIds
+    const patientId = selectedPatientData._id || selectedPatientData.id
+    const pharmacyId = selectedPharmacy._id || selectedPharmacy.id
+    
+    if (!patientId || !pharmacyId) {
+      setError('ID patient ou pharmacie manquant')
+      return
+    }
+
+    // Check if IDs look like MongoDB ObjectIds (24 hex characters)
+    const objectIdRegex = /^[0-9a-fA-F]{24}$/
+    if (!objectIdRegex.test(patientId)) {
+      setError('ID patient invalide. Veuillez sélectionner un patient valide.')
+      return
+    }
+    if (!objectIdRegex.test(pharmacyId)) {
+      setError('ID pharmacie invalide. Veuillez sélectionner une pharmacie valide.')
+      return
+    }
+
     setIsLoading(true)
+    setError(null)
+    
     try {
-      // Simulate API call delay
-      await new Promise(resolve => setTimeout(resolve, 1500))
-      
-      const prescription = {
-        ...prescriptionData,
-        doctorId,
-        pharmacyId: selectedPharmacy._id,
-        doctorNotes: prescriptionData.notes,
-        urgency: prescriptionData.urgency,
-        followUpDate: prescriptionData.followUpDate,
-        patientNotification: true,
-        pharmacyNotification: true
+      // Calculate expiry date (30 days from now by default)
+      const expiryDate = prescriptionData.followUpDate 
+        ? new Date(prescriptionData.followUpDate)
+        : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
+
+      const prescriptionPayload = {
+        patientId: patientId,
+        pharmacyId: pharmacyId,
+        diagnosis: prescriptionData.diagnosis,
+        medications: prescriptionData.medications.filter(med => med.name && med.dosage && med.frequency && med.duration),
+        instructions: prescriptionData.notes || '',
+        expiryDate: expiryDate.toISOString()
       }
 
-      // Utiliser le service pour sauvegarder l'ordonnance
-      const savedPrescription = prescriptionService.addPrescription(prescription)
+      // Send prescription to backend API
+      const response = await api.post('/api/prescriptions', prescriptionPayload)
+      const savedPrescription = response.data
       
       console.log('✅ Prescription sent successfully:', savedPrescription)
       
@@ -166,16 +265,34 @@ export default function PrescriptionSender({
       
     } catch (error) {
       console.error('Error sending prescription:', error)
+      
+      // Afficher les détails de l'erreur de validation
+      if (error.response?.status === 400) {
+        const errorData = error.response.data
+        if (errorData.errors && Array.isArray(errorData.errors)) {
+          const errorMessages = errorData.errors.map(err => err.msg || err.message).join(', ')
+          setError(`Erreur de validation: ${errorMessages}`)
+        } else {
+          setError(errorData.message || 'Erreur de validation')
+        }
+      } else {
+        setError(error.response?.data?.message || error.message || 'Erreur lors de l\'envoi de l\'ordonnance')
+      }
     } finally {
       setIsLoading(false)
     }
   }
 
-  const filteredPharmacies = pharmacies.filter(pharmacy =>
-    pharmacy.pharmacyName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    pharmacy.address.commune.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    pharmacy.address.wilaya.toLowerCase().includes(searchTerm.toLowerCase())
-  )
+  const filteredPharmacies = pharmacies.filter(pharmacy => {
+    if (!searchTerm) return true
+    
+    const search = searchTerm.toLowerCase()
+    const name = pharmacy.pharmacyName?.toLowerCase() || ''
+    const commune = pharmacy.location?.commune?.toLowerCase() || pharmacy.address?.commune?.toLowerCase() || ''
+    const wilaya = pharmacy.location?.wilaya?.toLowerCase() || pharmacy.address?.wilaya?.toLowerCase() || ''
+    
+    return name.includes(search) || commune.includes(search) || wilaya.includes(search)
+  })
 
   if (!isOpen) return null
 
@@ -217,6 +334,16 @@ export default function PrescriptionSender({
         </div>
 
         <div className="p-6">
+          {/* Error Message */}
+          {error && (
+            <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-xl">
+              <div className="flex items-center space-x-2">
+                <AlertCircle className="w-5 h-5 text-red-600" />
+                <p className="text-red-800">{error}</p>
+              </div>
+            </div>
+          )}
+          
           {/* Step 1: Patient Selection */}
           {step === 1 && (
             <div className="space-y-6">
@@ -226,40 +353,55 @@ export default function PrescriptionSender({
                   <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
                   <input
                     type="text"
-                    placeholder="Rechercher un patient..."
+                    placeholder="Rechercher un patient (nom, email, NSS)..."
+                    value={patientSearchTerm}
+                    onChange={(e) => setPatientSearchTerm(e.target.value)}
                     className="w-full pl-12 pr-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-4 focus:ring-primary-200 focus:border-primary-500 text-gray-900"
                   />
                 </div>
               </div>
 
-              {/* Mock patient list */}
+              {/* Patient search results */}
               <div className="space-y-3">
-                {[
-                  { _id: 'p1', fullName: 'Ahmed Benali', email: 'ahmed.benali@email.com', phone: '+213 555 123 456' },
-                  { _id: 'p2', fullName: 'Fatima Zohra', email: 'fatima.zohra@email.com', phone: '+213 555 789 012' },
-                  { _id: 'p3', fullName: 'Mohamed Amine', email: 'mohamed.amine@email.com', phone: '+213 555 345 678' }
-                ].map((patient) => (
-                  <div
-                    key={patient._id}
-                    onClick={() => {
-                      setSelectedPatientData(patient)
-                      setPrescriptionData(prev => ({ ...prev, patientId: patient._id }))
-                      setStep(2)
-                    }}
-                    className="p-4 border-2 border-gray-200 rounded-xl hover:border-primary-500 hover:bg-primary-50 cursor-pointer transition-all duration-200"
-                  >
-                    <div className="flex items-center space-x-4">
-                      <div className="w-12 h-12 bg-primary-100 rounded-full flex items-center justify-center">
-                        <User className="w-6 h-6 text-primary-600" />
-                      </div>
-                      <div className="flex-1">
-                        <h4 className="font-bold text-gray-900">{patient.fullName}</h4>
-                        <p className="text-gray-600">{patient.email}</p>
-                        <p className="text-gray-500 text-sm">{patient.phone}</p>
+                {isLoadingPatients ? (
+                  <div className="text-center py-8">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600 mx-auto"></div>
+                    <p className="text-gray-500 mt-2">Recherche en cours...</p>
+                  </div>
+                ) : patients.length === 0 && patientSearchTerm.length >= 2 ? (
+                  <div className="text-center py-8 text-gray-500">
+                    <p>Aucun patient trouvé</p>
+                  </div>
+                ) : patients.length === 0 ? (
+                  <div className="text-center py-8 text-gray-500">
+                    <p>Tapez au moins 2 caractères pour rechercher un patient</p>
+                  </div>
+                ) : (
+                  patients.map((patient) => (
+                    <div
+                      key={patient._id}
+                      onClick={() => {
+                        setSelectedPatientData(patient)
+                        setPrescriptionData(prev => ({ ...prev, patientId: patient._id }))
+                        setStep(2)
+                      }}
+                      className="p-4 border-2 border-gray-200 rounded-xl hover:border-primary-500 hover:bg-primary-50 cursor-pointer transition-all duration-200"
+                    >
+                      <div className="flex items-center space-x-4">
+                        <div className="w-12 h-12 bg-primary-100 rounded-full flex items-center justify-center">
+                          <User className="w-6 h-6 text-primary-600" />
+                        </div>
+                        <div className="flex-1">
+                          <h4 className="font-bold text-gray-900">{patient.userId?.fullName || patient.fullName}</h4>
+                          <p className="text-gray-600">{patient.userId?.email || patient.email}</p>
+                          {patient.nss && (
+                            <p className="text-gray-500 text-sm">NSS: {patient.nss}</p>
+                          )}
+                        </div>
                       </div>
                     </div>
-                  </div>
-                ))}
+                  ))
+                )}
               </div>
             </div>
           )}
@@ -457,7 +599,23 @@ export default function PrescriptionSender({
                 </div>
 
                 <div className="space-y-4">
-                  {filteredPharmacies.map((pharmacy) => (
+                  {filteredPharmacies.length === 0 ? (
+                    <div className="text-center py-8">
+                      <Building className="w-16 h-16 text-gray-300 mx-auto mb-4" />
+                      <p className="text-gray-500 text-lg">
+                        {searchTerm 
+                          ? `Aucune pharmacie trouvée pour "${searchTerm}"`
+                          : 'Aucune pharmacie disponible'
+                        }
+                      </p>
+                      {pharmacies.length === 0 && (
+                        <p className="text-gray-400 text-sm mt-2">
+                          Vérifiez votre connexion ou contactez l'administrateur
+                        </p>
+                      )}
+                    </div>
+                  ) : (
+                    filteredPharmacies.map((pharmacy) => (
                     <div
                       key={pharmacy._id}
                       onClick={() => setSelectedPharmacy(pharmacy)}
@@ -481,21 +639,18 @@ export default function PrescriptionSender({
                                 {pharmacy.isOpen ? 'Ouvert' : 'Fermé'}
                               </span>
                             </div>
-                            <p className="text-gray-600 mb-2">{pharmacy.ownerName}</p>
+                            <p className="text-gray-600 mb-2">{pharmacy.ownerName || pharmacy.userId?.fullName || ''}</p>
                             <div className="flex items-center text-gray-500 text-sm mb-2">
                               <MapPin className="w-4 h-4 mr-1" />
-                              <span>{pharmacy.address.street}, {pharmacy.address.commune}, {pharmacy.address.wilaya}</span>
+                              <span>
+                                {pharmacy.location?.street || pharmacy.address?.street || ''}
+                                {pharmacy.location?.commune || pharmacy.address?.commune ? `, ${pharmacy.location?.commune || pharmacy.address?.commune}` : ''}
+                                {pharmacy.location?.wilaya || pharmacy.address?.wilaya ? `, ${pharmacy.location?.wilaya || pharmacy.address?.wilaya}` : ''}
+                              </span>
                             </div>
                             <div className="flex items-center text-gray-500 text-sm">
                               <Phone className="w-4 h-4 mr-1" />
-                              <span>{pharmacy.phone}</span>
-                              <span className="mx-2">•</span>
-                              <span>{pharmacy.distance}</span>
-                              <span className="mx-2">•</span>
-                              <div className="flex items-center">
-                                <span className="text-yellow-500 mr-1">★</span>
-                                <span>{pharmacy.rating}</span>
-                              </div>
+                              <span>{pharmacy.contactInfo?.phone || pharmacy.phone || 'N/A'}</span>
                             </div>
                           </div>
                         </div>
@@ -504,7 +659,8 @@ export default function PrescriptionSender({
                         )}
                       </div>
                     </div>
-                  ))}
+                    ))
+                  )}
                 </div>
               </div>
             </div>
@@ -547,7 +703,12 @@ export default function PrescriptionSender({
                       <Building className="w-5 h-5 text-green-600" />
                       <div>
                         <p className="font-medium text-gray-900">{selectedPharmacy?.pharmacyName}</p>
-                        <p className="text-gray-600 text-sm">{selectedPharmacy?.address.commune}, {selectedPharmacy?.address.wilaya}</p>
+                        <p className="text-gray-600 text-sm">
+                          {selectedPharmacy?.location?.commune || selectedPharmacy?.address?.commune || ''}
+                          {selectedPharmacy?.location?.wilaya || selectedPharmacy?.address?.wilaya 
+                            ? `, ${selectedPharmacy?.location?.wilaya || selectedPharmacy?.address?.wilaya}` 
+                            : ''}
+                        </p>
                       </div>
                     </div>
                   </div>

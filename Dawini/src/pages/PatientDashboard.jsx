@@ -62,68 +62,31 @@ export default function PatientDashboard() {
       try {
         setIsLoading(true)
         
-        // Simulate API call with mock appointments data
-        await new Promise(resolve => setTimeout(resolve, 1000))
+        // Fetch appointments from API
+        const appointmentsResponse = await api.get('/api/appointments')
+        const appointmentsData = appointmentsResponse.data.appointments || appointmentsResponse.data || []
         
-        // Mock appointments data
-        const mockAppointments = [
-          {
-            _id: '1',
-            date: '2024-01-20',
-            time: '10:00',
-            reason: 'Consultation de routine',
-            status: 'confirmed',
-            doctorId: {
-              specialization: 'Cardiologie',
-              userId: {
-                fullName: 'Dr. Ahmed Benali',
-                phone: '+213 555 123 456',
-                address: {
-                  commune: 'Hydra',
-                  wilaya: 'Alger'
-                }
-              }
-            }
-          },
-          {
-            _id: '2',
-            date: '2024-01-25',
-            time: '14:30',
-            reason: 'Suivi médical',
-            status: 'pending',
-            doctorId: {
-              specialization: 'Dermatologie',
-              userId: {
-                fullName: 'Dr. Fatima Zohra',
-                phone: '+213 555 789 012',
-                address: {
-                  commune: 'El Mouradia',
-                  wilaya: 'Alger'
-                }
-              }
-            }
-          },
-          {
-            _id: '3',
-            date: '2024-02-01',
-            time: '09:15',
-            reason: 'Examen de contrôle',
-            status: 'confirmed',
-            doctorId: {
-              specialization: 'Pédiatrie',
-              userId: {
-                fullName: 'Dr. Mohamed Cherif',
-                phone: '+213 555 345 678',
-                address: {
-                  commune: 'Bab Ezzouar',
-                  wilaya: 'Alger'
+        // Populate doctor information if not already populated
+        const appointmentsWithDoctorInfo = appointmentsData.map(appointment => {
+          // Ensure doctorId has the correct structure
+          if (appointment.doctorId && !appointment.doctorId.userId && appointment.doctorId.fullName) {
+            // If doctorId is already populated but in a different format
+            return {
+              ...appointment,
+              doctorId: {
+                ...appointment.doctorId,
+                userId: {
+                  fullName: appointment.doctorId.fullName,
+                  phone: appointment.doctorId.phone,
+                  address: appointment.doctorId.address
                 }
               }
             }
           }
-        ]
+          return appointment
+        })
         
-        setAppointments(mockAppointments)
+        setAppointments(appointmentsWithDoctorInfo)
         
       } catch (error) {
         console.error('Error loading data:', error)
@@ -147,8 +110,8 @@ export default function PatientDashboard() {
     try {
       setCancellingAppointment(appointmentId)
       
-      // Simulate API call - replace with actual endpoint
-      await new Promise(resolve => setTimeout(resolve, 1500))
+      // Call API to cancel appointment
+      await api.delete(`/api/appointments/${appointmentId}`)
       
       // Update appointments list by removing the cancelled appointment
       setAppointments(prevAppointments => 
@@ -158,13 +121,13 @@ export default function PatientDashboard() {
       // Close modal
       setCancelModal({ isOpen: false, appointmentId: null, appointmentInfo: null })
       
-      // Show success message (you could add a toast notification here)
+      // Show success message
       console.log('Rendez-vous annulé avec succès')
       
       } catch (error) {
       console.error('Error cancelling appointment:', error)
-      // Show error message (you could add a toast notification here)
-      console.log('Erreur lors de l\'annulation du rendez-vous')
+      const errorMessage = error.response?.data?.error || error.response?.data?.message || 'Erreur lors de l\'annulation du rendez-vous'
+      alert(`Erreur: ${errorMessage}`)
     } finally {
       setCancellingAppointment(null)
     }

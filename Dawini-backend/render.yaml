@@ -1,0 +1,33 @@
+services:
+  - type: web
+    name: dawini-backend
+    env: node
+    plan: starter
+    buildCommand: npm install
+    startCommand: npm run start:simple
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 10000
+      - key: MONGODB_URI
+        sync: false  # Set this in Render dashboard
+      - key: JWT_SECRET
+        sync: false  # Set this in Render dashboard
+      - key: FRONTEND_URL
+        sync: false  # Set this to your frontend URL
+      - key: SMTP_HOST
+        sync: false  # Optional: Set if using email
+      - key: SMTP_PORT
+        value: 587
+      - key: SMTP_USER
+        sync: false  # Optional: Set if using email
+      - key: SMTP_PASS
+        sync: false  # Optional: Set if using email
+      - key: GOOGLE_MAPS_API_KEY
+        sync: false  # Optional: Set if using Google Maps
+      - key: UPLOAD_PATH
+        value: ./uploads
+      - key: MAX_FILE_SIZE
+        value: 5242880
+

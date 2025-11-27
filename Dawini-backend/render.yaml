@@ -3,6 +3,7 @@ services:
     name: dawini-backend
     env: node
     plan: starter
+    rootDir: Dawini-backend
     buildCommand: npm install
     startCommand: npm run start:simple
     envVars:

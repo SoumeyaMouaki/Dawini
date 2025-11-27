@@ -49,9 +49,9 @@ L'application se compose de deux services :
 3. Configurez :
    - **Name** : `dawini-backend`
    - **Environment** : `Node`
-   - **Root Directory** : `Dawini-backend`
+   - **Root Directory** : `Dawini-backend` ⚠️ **IMPORTANT : Ce champ est crucial !**
    - **Build Command** : `npm install`
-   - **Start Command** : `npm start`
+   - **Start Command** : `npm run start:simple`
    - **Plan** : Free (ou Starter pour de meilleures performances)
 
 4. Ajoutez les variables d'environnement (voir ci-dessus)
@@ -82,7 +82,7 @@ L'application se compose de deux services :
 3. Configurez :
    - **Name** : `dawini-frontend`
    - **Root Directory** : `Dawini`
-   - **Build Command** : `npm install && npm run build`
+   - **Build Command** : `npm install --legacy-peer-deps && npm run build`
    - **Publish Directory** : `dist`
 
 4. Ajoutez la variable d'environnement :
@@ -98,8 +98,8 @@ L'application se compose de deux services :
 2. Connectez votre repository GitHub
 3. Configurez :
    - **Name** : `dawini-frontend`
-   - **Root Directory** : `Dawini`
-   - **Build Command** : `npm install && npm run build`
+   - **Root Directory** : `Dawini` ⚠️ **IMPORTANT : Ce champ est crucial !**
+   - **Build Command** : `npm install --legacy-peer-deps && npm run build`
    - **Publish Directory** : `dist`
 
 4. Ajoutez la variable d'environnement :
@@ -131,7 +131,32 @@ Après le déploiement :
 2. **Frontend** : Visitez l'URL du frontend
    - L'application devrait se charger correctement
 
+## ⚠️ Problème courant : Root Directory manquant
+
+Si vous voyez l'erreur :
+```
+Service Root Directory « /opt/render/project/src/backend » est manquant.
+```
+
+**Solution** : Vérifiez que le **Root Directory** est bien configuré dans les Settings de votre service Render :
+- Backend : `Dawini-backend`
+- Frontend : `Dawini`
+
+Voir le fichier `RENDER_FIX.md` pour plus de détails.
+
 ## Dépannage
+
+### Erreur de dépendances npm (ERESOLVE)
+
+Si vous voyez une erreur comme :
+```
+npm error ERESOLVE could not resolve
+npm error Conflicting peer dependency
+```
+
+**Solution** : La commande de build utilise déjà `--legacy-peer-deps` pour résoudre les conflits de dépendances. Si le problème persiste :
+1. Vérifiez que la commande de build inclut `--legacy-peer-deps`
+2. Assurez-vous que `react-leaflet` a été supprimé du `package.json` (il n'est pas utilisé dans le code)
 
 ### Backend ne démarre pas
 

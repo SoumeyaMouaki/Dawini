@@ -3,7 +3,7 @@ services:
     name: dawini-frontend
     env: static
     rootDir: Dawini
-    buildCommand: npm install --legacy-peer-deps && npm run build
+    buildCommand: rm -rf node_modules package-lock.json && npm install --legacy-peer-deps && npm run build
     staticPublishPath: ./dist
     envVars:
       - key: VITE_API_BASE_URL

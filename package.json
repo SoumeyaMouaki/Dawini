@@ -1,0 +1,24 @@
+{
+  "name": "dawini-projet",
+  "version": "1.0.0",
+  "main": "migrate.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/SoumeyaMouaki/Dawini.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/SoumeyaMouaki/Dawini/issues"
+  },
+  "homepage": "https://github.com/SoumeyaMouaki/Dawini#readme",
+  "description": "",
+  "dependencies": {
+    "dotenv": "^17.2.3",
+    "mongodb": "^7.0.0"
+  }
+}

@@ -99,7 +99,8 @@ L'application se compose de deux services :
 3. Configurez :
    - **Name** : `dawini-frontend`
    - **Root Directory** : `Dawini` ⚠️ **IMPORTANT : Ce champ est crucial !**
-   - **Build Command** : `npm install --legacy-peer-deps && npm run build`
+   - **Node Version** : `20` (recommandé, au lieu de 22 par défaut)
+   - **Build Command** : `rm -rf node_modules package-lock.json && npm install --legacy-peer-deps && npm run build`
    - **Publish Directory** : `dist`
 
 4. Ajoutez la variable d'environnement :
@@ -163,6 +164,18 @@ npm error Conflicting peer dependency
 - Vérifiez les logs dans le dashboard Render
 - Vérifiez que toutes les variables d'environnement sont définies
 - Vérifiez que MongoDB Atlas autorise les connexions depuis `0.0.0.0/0`
+
+### Erreur Rollup (@rollup/rollup-linux-x64-gnu not found)
+
+Si vous voyez une erreur comme :
+```
+Error: Cannot find module @rollup/rollup-linux-x64-gnu
+```
+
+**Solution** :
+1. Vérifiez que la commande de build nettoie et réinstalle : `rm -rf node_modules package-lock.json && npm install --legacy-peer-deps && npm run build`
+2. Spécifiez Node.js version 20 dans les Settings (au lieu de 22 par défaut)
+3. Voir `ROLLUP_FIX.md` pour plus de détails
 
 ### Frontend ne peut pas se connecter au backend
 
